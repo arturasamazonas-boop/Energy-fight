@@ -15,8 +15,10 @@ export function viewFor(sim: Sim, id: string) {
   };
 }
 
+const seqs = new WeakMap<Sim, number>();
+
 export function runBots(sim: Sim, opts: Record<string, BotOptions> = {}, maxSeconds = 1500) {
-  let seq = 1;
+  let seq = seqs.get(sim) ?? 1;
   const ticks = maxSeconds * 20;
   for (let i = 0; i < ticks && sim.result === "running"; i++) {
     if (i % 2 === 0) {
@@ -30,6 +32,7 @@ export function runBots(sim: Sim, opts: Record<string, BotOptions> = {}, maxSeco
     sim.tick();
     sim.drainFx();
   }
+  seqs.set(sim, seq);
   return sim;
 }
 

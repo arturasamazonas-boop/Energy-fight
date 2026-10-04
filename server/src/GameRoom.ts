@@ -24,6 +24,8 @@ import { EnemyS, GameState, HazardS, PickupS, PlayerS } from "./schema.ts";
 export interface RoomServices {
   profiles: ProfileService;
   log?: (msg: string) => void;
+  /** Automated tests only: lets a room run several simulation steps per tick. */
+  allowTestSpeed?: boolean;
 }
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -61,6 +63,7 @@ export class GameRoom extends Room {
   private rewardChain: Promise<unknown> = Promise.resolve();
   private results: ResultsMsg | null = null;
   private startedAt = 0;
+  private speed = 1;
 
   get svc() {
     return GameRoom.services;
@@ -71,6 +74,7 @@ export class GameRoom extends Room {
     activeCodes.add(code);
     this.roomId = code;
     this.state.code = code;
+    if (this.svc.allowTestSpeed && Number.isInteger(options?.testSpeed)) this.speed = Math.max(1, Math.min(10, options.testSpeed));
     this.setPrivate(true);
     this.setPatchRate(NET.patchMs);
     this.setSimulationInterval(() => this.tick(), 1000 / NET.tickHz);
@@ -309,11 +313,13 @@ export class GameRoom extends Room {
     }
     const sim = this.sim;
     if (!sim || this.state.phase !== "running") return;
-    sim.tick();
-    const fx = sim.drainFx();
+    const fx = [];
+    for (let i = 0; i < this.speed && sim.result === "running"; i++) {
+      sim.tick();
+      fx.push(...sim.drainFx());
+      for (const c of sim.drainClears()) this.queueSectionRewards(c.sectionId, c.eligibility);
+    }
     if (fx.length) this.broadcast("fx", fx);
-    const clears = sim.drainClears();
-    for (const c of clears) this.queueSectionRewards(c.sectionId, c.eligibility);
     this.syncState();
     if (sim.result !== "running") this.finish(sim.result === "success");
   }

@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "notes": "Runtime art contract. status=placeholder means the game draws a procedural stand-in. Put a finished file in client/public/assets/<file>, set status to 'provided', run `npm run assets:validate`, then rebuild. Concepts/portraits are NOT runtime sprites.",
+  "spriteContract": {
+    "frameWidth": 128,
+    "frameHeight": 128,
+    "feetAnchor": { "x": 64, "y": 118 },
+    "facings": ["right", "down", "up", "left"],
+    "facingNote": "Prototype renders 'right' and mirrors it for 'left'. Rows for down/up are optional until directional animation is implemented; when present they are rows 2 and 3.",
+    "minTransparentPadding": 4,
+    "worldScale": "Displayed at 0.62 of frame size; a character is ~75 px tall on a 400 px-high view.",
+    "format": "PNG, RGBA (color type 6), straight alpha, no background"
+  },
+  "animations": {
+    "idle": { "frames": 4, "fps": 6, "loop": true },
+    "run": { "frames": 6, "fps": 12, "loop": true },
+    "attack1": { "frames": 4, "fps": 16, "loop": false },
+    "attack2": { "frames": 4, "fps": 16, "loop": false },
+    "attack3": { "frames": 5, "fps": 14, "loop": false },
+    "dodge": { "frames": 3, "fps": 16, "loop": false },
+    "skill1": { "frames": 5, "fps": 14, "loop": false },
+    "skill2": { "frames": 5, "fps": 14, "loop": false },
+    "hurt": { "frames": 2, "fps": 12, "loop": false },
+    "downed": { "frames": 2, "fps": 4, "loop": true }
+  },
+  "sheetLayout": "One row per facing. Columns are the animations above concatenated in the listed order: idle(4) run(6) attack1(4) attack2(4) attack3(5) dodge(3) skill1(5) skill2(5) hurt(2) downed(2) = 40 columns × 128 px = 5120 px wide. A single-frame sheet (one 128×128 'idle' frame) is accepted as an interim replacement.",
+  "assets": [
+    { "id": "char.pyra.base", "file": "char_pyra_base.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 128, "frameHeight": 128, "anchor": { "x": 64, "y": 118 }, "facing": "right", "worldScale": 0.62, "transparent": true, "status": "placeholder" },
+    { "id": "char.pyra.flare", "file": "char_pyra_flare.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 128, "frameHeight": 128, "anchor": { "x": 64, "y": 118 }, "facing": "right", "worldScale": 0.62, "transparent": true, "status": "placeholder" },
+    { "id": "char.pyra.furnace", "file": "char_pyra_furnace.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 128, "frameHeight": 128, "anchor": { "x": 64, "y": 118 }, "facing": "right", "worldScale": 0.62, "transparent": true, "status": "placeholder" },
+    { "id": "char.krios.base", "file": "char_krios_base.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 128, "frameHeight": 128, "anchor": { "x": 64, "y": 118 }, "facing": "right", "worldScale": 0.62, "transparent": true, "status": "placeholder" },
+    { "id": "char.krios.prism", "file": "char_krios_prism.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 128, "frameHeight": 128, "anchor": { "x": 64, "y": 118 }, "facing": "right", "worldScale": 0.62, "transparent": true, "status": "placeholder" },
+    { "id": "char.krios.glacier", "file": "char_krios_glacier.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 128, "frameHeight": 128, "anchor": { "x": 64, "y": 118 }, "facing": "right", "worldScale": 0.62, "transparent": true, "status": "placeholder" },
+    { "id": "char.vektor.base", "file": "char_vektor_base.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 128, "frameHeight": 128, "anchor": { "x": 64, "y": 118 }, "facing": "right", "worldScale": 0.62, "transparent": true, "status": "placeholder" },
+    { "id": "char.vektor.tempest", "file": "char_vektor_tempest.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 128, "frameHeight": 128, "anchor": { "x": 64, "y": 118 }, "facing": "right", "worldScale": 0.62, "transparent": true, "status": "placeholder" },
+    { "id": "char.vektor.raptor", "file": "char_vektor_raptor.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 128, "frameHeight": 128, "anchor": { "x": 64, "y": 118 }, "facing": "right", "worldScale": 0.62, "transparent": true, "status": "placeholder" },
+    { "id": "char.litos.base", "file": "char_litos_base.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 128, "frameHeight": 128, "anchor": { "x": 64, "y": 118 }, "facing": "right", "worldScale": 0.62, "transparent": true, "status": "placeholder" },
+    { "id": "char.litos.monolith", "file": "char_litos_monolith.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 128, "frameHeight": 128, "anchor": { "x": 64, "y": 118 }, "facing": "right", "worldScale": 0.62, "transparent": true, "status": "placeholder" },
+    { "id": "char.litos.seismic", "file": "char_litos_seismic.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 128, "frameHeight": 128, "anchor": { "x": 64, "y": 118 }, "facing": "right", "worldScale": 0.62, "transparent": true, "status": "placeholder" },
+    { "id": "enemy.pursuer.provided", "file": "enemy_pursuer.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 96, "frameHeight": 96, "anchor": { "x": 48, "y": 88 }, "facing": "right", "worldScale": 0.66, "transparent": true, "status": "placeholder" },
+    { "id": "enemy.ranged.provided", "file": "enemy_ranged.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 96, "frameHeight": 96, "anchor": { "x": 48, "y": 88 }, "facing": "right", "worldScale": 0.66, "transparent": true, "status": "placeholder" },
+    { "id": "enemy.armored.provided", "file": "enemy_armored.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 128, "frameHeight": 128, "anchor": { "x": 64, "y": 118 }, "facing": "right", "worldScale": 0.62, "transparent": true, "status": "placeholder" },
+    { "id": "enemy.support.provided", "file": "enemy_support.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 96, "frameHeight": 96, "anchor": { "x": 48, "y": 88 }, "facing": "right", "worldScale": 0.66, "transparent": true, "status": "placeholder" },
+    { "id": "enemy.boss.provided", "file": "enemy_boss.png", "role": "runtime-sprite", "format": "png-rgba", "frameWidth": 256, "frameHeight": 256, "anchor": { "x": 128, "y": 236 }, "facing": "right", "worldScale": 0.75, "transparent": true, "status": "placeholder" },
+    { "id": "env.station_nexus", "file": "env_station_nexus.png", "role": "background", "format": "png-or-jpg", "width": 4300, "height": 500, "anchor": { "x": 0, "y": 0 }, "facing": "fixed-oblique", "worldScale": 1, "transparent": false, "status": "placeholder", "note": "Whole mission strip, ground y 0..600 projected to 0..372 px plus 110 px back wall above and ~20 px foreground. Must match the 0.62 depth scale." },
+    { "id": "concept.lineages_sheet", "file": "concept_lineages_sheet.png", "role": "concept", "format": "png", "transparent": false, "status": "reference-only", "note": "Style exploration. Not loaded at runtime." },
+    { "id": "concept.portrait.pyra", "file": "concept_pyra.png", "role": "concept", "format": "png", "transparent": true, "status": "reference-only" },
+    { "id": "concept.portrait.krios", "file": "concept_krios.png", "role": "concept", "format": "png", "transparent": true, "status": "reference-only" },
+    { "id": "concept.portrait.vektor", "file": "concept_vektor.png", "role": "concept", "format": "png", "transparent": true, "status": "reference-only" },
+    { "id": "concept.portrait.litos", "file": "concept_litos.png", "role": "concept", "format": "png", "transparent": true, "status": "reference-only" }
+  ]
+}

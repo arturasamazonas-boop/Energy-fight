@@ -17,6 +17,7 @@ export interface AppOptions {
   clientDist?: string;
   devTools?: boolean;
   quiet?: boolean;
+  allowTestSpeed?: boolean;
 }
 
 export interface RunningApp {
@@ -36,7 +37,7 @@ export async function startApp(opts: AppOptions): Promise<RunningApp> {
   const db = await openDb({ url: opts.databaseUrl, dataDir: opts.dataDir });
   log(`database: ${db.kind}${db.kind === "pglite" ? ` (${opts.dataDir ?? "in-memory"})` : ""}`);
   const profiles = new ProfileService(db);
-  GameRoom.services = { profiles, log };
+  GameRoom.services = { profiles, log, allowTestSpeed: !!opts.allowTestSpeed };
   ActiveRuns.clear();
 
   const transport = new WebSocketTransport({ pingInterval: 3000, pingMaxRetries: 3 } as any);
