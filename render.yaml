@@ -1,0 +1,18 @@
+# Render Blueprint: one Node web service that serves the built client and the
+# Colyseus WebSocket server on the same HTTPS/WSS origin.
+services:
+  - type: web
+    name: energy-fight
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22.22.0"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false # paste the Neon connection string in the Render dashboard

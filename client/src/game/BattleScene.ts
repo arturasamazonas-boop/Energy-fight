@@ -175,7 +175,7 @@ export class BattleScene extends Phaser.Scene {
   private drawEnvironment() {
     const bgId = "env.station_nexus";
     if (this.provided.has(bgId) && this.textures.exists(bgId)) {
-      this.add.image(0, sy(0) - 120, bgId).setOrigin(0, 0).setDepth(-2000);
+      this.add.image(0, sy(0) - 110, bgId).setOrigin(0, 0).setDepth(-2000);
       return;
     }
     const g = this.add.graphics().setDepth(-1000);

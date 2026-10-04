@@ -43,6 +43,9 @@ export class Controls {
     this.stickBase = this.root.querySelector(".stick-base")!;
     this.stickKnob = this.root.querySelector(".stick-knob")!;
     this.root.querySelectorAll<HTMLElement>(".cbtn").forEach((b) => (this.buttons[b.dataset.a!] = b));
+    const help = this.root.querySelector(".keys-help") as HTMLElement;
+    const helpTimer = window.setTimeout(() => help.classList.add("faded"), 9000);
+    this.cleanup.push(() => clearTimeout(helpTimer));
 
     const zone = this.root.querySelector<HTMLElement>(".stick-zone")!;
     this.listen(zone, "pointerdown", (e: PointerEvent) => {

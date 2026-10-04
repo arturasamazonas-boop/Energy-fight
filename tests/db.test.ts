@@ -6,8 +6,9 @@ import path from "node:path";
 import { openDb } from "../server/src/db.ts";
 import { ProfileService } from "../server/src/profiles.ts";
 
+// Set TEST_DATABASE_URL to run these against a real PostgreSQL server; by default PGlite is used.
 async function service(dataDir?: string) {
-  const db = await openDb({ dataDir });
+  const db = await openDb(dataDir ? { dataDir } : { url: process.env.TEST_DATABASE_URL || undefined });
   return { db, svc: new ProfileService(db) };
 }
 
@@ -20,7 +21,7 @@ test("guest credentials are random, hashed and validated", async () => {
   assert.equal(await svc.authenticate(a.token), a.profile.id);
   assert.equal(await svc.authenticate("nope-nope-nope-nope-nope"), null);
   assert.equal(b.profile.name, "bBo/b");
-  const rows = await db.query("SELECT token_hash FROM profiles");
+  const rows = await db.query("SELECT token_hash FROM profiles WHERE id = ANY($1)", [[a.profile.id, b.profile.id]]);
   assert.ok(rows.every((r: any) => r.token_hash !== a.token && r.token_hash.length === 64));
   assert.equal(Object.keys(a.profile.lineages).length, 4);
   await db.close();

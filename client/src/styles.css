@@ -171,6 +171,7 @@ body.in-game #stage { display: block; }
 .cbtn.disabled { filter: grayscale(.8); }
 .cbtn.gone { display: none; }
 .cbtn.pressed { transform: scale(.92); }
+.keys-help.faded { opacity: 0; transition: opacity 1s; }
 .keys-help { position: absolute; left: calc(10px + var(--safe-l)); bottom: calc(6px + var(--safe-b)); font-size: 11px; color: #ffffff55; max-width: 40vw; pointer-events: none; }
 @media (pointer: coarse) { .keys-help { display: none; } }
 @media (hover: hover) and (pointer: fine) { .cbtn { opacity: .75; } }
