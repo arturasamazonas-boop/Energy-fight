@@ -1,0 +1,185 @@
+import fs from "node:fs";
+import path from "node:path";
+import express from "express";
+import { Server, matchMaker } from "colyseus";
+import { WebSocketTransport } from "@colyseus/ws-transport";
+import { ROOM_NAME, isLineage, validateConfig } from "@ef/shared";
+import { openDb, type Db } from "./db.ts";
+import { GameRoom } from "./GameRoom.ts";
+import { ActiveRuns } from "./locks.ts";
+import { LabError, ProfileService } from "./profiles.ts";
+
+export interface AppOptions {
+  port: number;
+  host?: string;
+  databaseUrl?: string;
+  dataDir?: string;
+  clientDist?: string;
+  devTools?: boolean;
+  quiet?: boolean;
+}
+
+export interface RunningApp {
+  port: number;
+  db: Db;
+  profiles: ProfileService;
+  gameServer: Server;
+  close(): Promise<void>;
+}
+
+export async function startApp(opts: AppOptions): Promise<RunningApp> {
+  const configErrors = validateConfig();
+  if (configErrors.length) throw new Error("Invalid game config:\n" + configErrors.join("\n"));
+  const log = (m: string) => {
+    if (!opts.quiet) console.log(`[server] ${m}`);
+  };
+  const db = await openDb({ url: opts.databaseUrl, dataDir: opts.dataDir });
+  log(`database: ${db.kind}${db.kind === "pglite" ? ` (${opts.dataDir ?? "in-memory"})` : ""}`);
+  const profiles = new ProfileService(db);
+  GameRoom.services = { profiles, log };
+  ActiveRuns.clear();
+
+  const transport = new WebSocketTransport({ pingInterval: 3000, pingMaxRetries: 3 } as any);
+  const app = transport.getExpressApp();
+  app.disable("x-powered-by");
+  app.use("/api", express.json({ limit: "8kb" }));
+
+  // ---- guest creation rate limit (per IP, in memory) ----
+  const guestHits = new Map<string, number[]>();
+  const allowGuest = (ip: string) => {
+    const now = Date.now();
+    const list = (guestHits.get(ip) ?? []).filter((t) => now - t < 3600_000);
+    if (list.length >= 30) return false;
+    list.push(now);
+    guestHits.set(ip, list);
+    return true;
+  };
+
+  const auth = async (req: express.Request): Promise<string | null> => {
+    const h = req.headers.authorization ?? "";
+    const token = h.startsWith("Bearer ") ? h.slice(7) : "";
+    return profiles.authenticate(token);
+  };
+  const handle =
+    (fn: (req: express.Request, res: express.Response, profileId: string) => Promise<unknown>, needsAuth = true) =>
+    async (req: express.Request, res: express.Response) => {
+      try {
+        let profileId = "";
+        if (needsAuth) {
+          const id = await auth(req);
+          if (!id) return void res.status(401).json({ error: "invalid_credential" });
+          profileId = id;
+        }
+        const out = await fn(req, res, profileId);
+        if (!res.headersSent) res.json(out);
+      } catch (e: any) {
+        if (e instanceof LabError) return void res.status(400).json({ error: e.code });
+        log(`api error ${req.path}: ${e?.message}`);
+        res.status(500).json({ error: "server_error" });
+      }
+    };
+  const labGuard = (profileId: string) => {
+    if (ActiveRuns.isRunning(profileId)) throw new LabError("in_run");
+  };
+  const lineageOf = (v: unknown) => {
+    if (!isLineage(v)) throw new LabError("invalid_lineage");
+    return v;
+  };
+
+  app.get("/api/health", (_req, res) => void res.json({ ok: true, db: db.kind }));
+  app.get("/api/config", (_req, res) => void res.json({ devTools: !!opts.devTools }));
+  app.post(
+    "/api/guest",
+    handle(async (req, res) => {
+      if (!allowGuest(req.ip ?? "?")) return void res.status(429).json({ error: "rate_limited" });
+      return profiles.createGuest(req.body?.name);
+    }, false),
+  );
+  app.get("/api/profile", handle(async (_req, _res, id) => ({ profile: await profiles.getProfile(id), inRun: ActiveRuns.isRunning(id) })));
+  app.post(
+    "/api/profile/name",
+    handle(async (req, _res, id) => {
+      await profiles.rename(id, req.body?.name);
+      return { profile: await profiles.getProfile(id) };
+    }),
+  );
+  app.post(
+    "/api/lab/lineage",
+    handle(async (req, _res, id) => {
+      labGuard(id);
+      await profiles.setLastLineage(id, lineageOf(req.body?.lineage));
+      return { profile: await profiles.getProfile(id) };
+    }),
+  );
+  app.post(
+    "/api/lab/evolve",
+    handle(async (req, _res, id) => {
+      labGuard(id);
+      return { profile: await profiles.chooseEvolution(id, lineageOf(req.body?.lineage), String(req.body?.evolution ?? "")) };
+    }),
+  );
+  app.post(
+    "/api/lab/modifier",
+    handle(async (req, _res, id) => {
+      labGuard(id);
+      return { profile: await profiles.chooseModifier(id, lineageOf(req.body?.lineage), String(req.body?.modifier ?? "")) };
+    }),
+  );
+  app.post(
+    "/api/lab/module/upgrade",
+    handle(async (req, _res, id) => {
+      labGuard(id);
+      return { profile: await profiles.upgradeModule(id, lineageOf(req.body?.lineage), String(req.body?.module ?? "")) };
+    }),
+  );
+  app.post(
+    "/api/lab/module/equip",
+    handle(async (req, _res, id) => {
+      labGuard(id);
+      const m = req.body?.module;
+      return { profile: await profiles.equipModule(id, lineageOf(req.body?.lineage), m === null ? null : String(m ?? "")) };
+    }),
+  );
+  if (opts.devTools) {
+    // Development only: creates a NEW separate test profile at a chosen level.
+    // It never edits an existing profile and is disabled unless DEV_TOOLS=1 outside production.
+    app.post(
+      "/api/dev/seed",
+      handle(async (req) => {
+        const level = Math.max(1, Math.min(20, Number(req.body?.level) || 1));
+        const tier = level >= 17 ? 3 : level >= 10 ? 2 : 1;
+        return profiles.createGuest(req.body?.name ?? `Test L${level}`, { level, tierUnlocked: tier, salvage: 60 });
+      }, false),
+    );
+  }
+
+  if (opts.clientDist && fs.existsSync(opts.clientDist)) {
+    app.use(express.static(opts.clientDist, { index: "index.html", maxAge: "1h", setHeaders: (res, p) => {
+      if (p.endsWith("index.html")) res.setHeader("Cache-Control", "no-cache");
+    } }));
+    app.get(/^\/(?!api|matchmake).*/, (_req, res) => res.sendFile(path.join(opts.clientDist!, "index.html")));
+    log(`serving client from ${opts.clientDist}`);
+  }
+
+  const gameServer = new Server({ transport, greet: false, gracefullyShutdown: false } as any);
+  gameServer.define(ROOM_NAME, GameRoom);
+  await gameServer.listen(opts.port, opts.host);
+  const address = (transport as any).server?.address?.();
+  const port = typeof address === "object" && address ? address.port : opts.port;
+  log(`listening on ${opts.host ?? "0.0.0.0"}:${port}`);
+
+  return {
+    port,
+    db,
+    profiles,
+    gameServer,
+    async close() {
+      try {
+        await gameServer.gracefullyShutdown(false);
+      } catch {}
+      await db.close();
+    },
+  };
+}
+
+export { matchMaker };
