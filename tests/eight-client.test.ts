@@ -70,9 +70,9 @@ test("eight simulated clients complete a mission; per-profile rewards match the 
   for (let i = 0; i < 8; i++) {
     const r = results.players.find((p: any) => p.name === `Bot${i}`);
     assert.ok(r, `result for Bot${i}`);
-    const ledger = await app.db.query("SELECT * FROM reward_ledger WHERE run_id = $1 AND profile_id = $2 ORDER BY section_id", [runId, profiles[i].profile.id]);
-    const xpSum = ledger.reduce((a: number, row: any) => a + Number(row.xp), 0);
-    const salvageSum = ledger.reduce((a: number, row: any) => a + Number(row.salvage), 0);
+    const ledger: any[] = await app.db.query("SELECT * FROM reward_ledger WHERE run_id = $1 AND profile_id = $2 ORDER BY section_id", [runId, profiles[i].profile.id]);
+    const xpSum: number = ledger.reduce((a: number, row: any) => a + Number(row.xp), 0);
+    const salvageSum: number = ledger.reduce((a: number, row: any) => a + Number(row.salvage), 0);
     assert.equal(r.totalXp, xpSum, `Bot${i} displayed XP equals persisted ledger`);
     assert.equal(r.totalSalvage, salvageSum, `Bot${i} displayed salvage equals ledger`);
     const prof = await app.profiles.getProfile(profiles[i].profile.id);
