@@ -294,3 +294,52 @@ test("downed teammate can be revived by standing close", () => {
   assert.equal(b.life, "alive");
   assert.equal(a.stats.revives, 1);
 });
+
+test("Crystal Warden: pylons shield the boss, breaking them staggers it", async () => {
+  const { WARDEN } = await import("../shared/src/index.ts");
+  const sim = new Sim({ runId: "warden", tier: 1, partySize: 1, seed: 4, boss: "warden" });
+  sim.addPlayer("p", "pp", "P", loadoutFor("pyra", 12));
+  const p = sim.players.get("p")!;
+  const boss = sim.spawn("boss", 3800, 300)!;
+  assert.equal(boss.variant, "warden");
+  sim.tick(); // raises pylons
+  const pylons = [...sim.enemies.values()].filter((e) => e.kind === "pylon");
+  assert.equal(pylons.length, WARDEN.pylons);
+  const hp0 = boss.hp;
+  (sim as any).damageEnemy(p, boss, 1000, 0, false, 0, p.x, p.y);
+  const shieldedLoss = hp0 - boss.hp;
+  assert.ok(shieldedLoss <= 1000 * (1 - WARDEN.shieldReduction) * 1.2, `shielded loss ${shieldedLoss}`);
+  for (const py of pylons) (sim as any).damageEnemy(p, py, 1e6, 0, false, 0, p.x, p.y);
+  assert.equal([...sim.enemies.values()].filter((e) => e.kind === "pylon").length, 0);
+  assert.equal(boss.state, "stagger", "boss is exposed when the last pylon breaks");
+  const hp1 = boss.hp;
+  (sim as any).damageEnemy(p, boss, 1000, 0, false, 0, p.x, p.y);
+  assert.ok(hp1 - boss.hp > shieldedLoss * 4, "full damage once exposed");
+});
+
+test("Crystal Warden beam hurts players on the line and is dodged with i-frames", async () => {
+  const sim = new Sim({ runId: "beam", tier: 1, partySize: 2, seed: 4, boss: "warden" });
+  sim.addPlayer("a", "pa", "A", loadoutFor("litos", 10));
+  sim.addPlayer("b", "pb", "B", loadoutFor("litos", 10));
+  const a = sim.players.get("a")!;
+  const b = sim.players.get("b")!;
+  const boss = sim.spawn("boss", 3600, 300)!;
+  boss.state = "stagger";
+  boss.t = 99;
+  a.x = 3800; a.y = 300; // on the beam line
+  b.x = 3800; b.y = 300;
+  b.iframes = 99; // dodging through it
+  (sim as any).addHazard({ kind: "beam", side: "enemy", ownerId: boss.id, x: boss.x, y: boss.y, r: 17, delay: 0, life: 1, dps: 200, slow: 0, stagger: 0, hitOnce: false, ang: 0, len: 540, spin: 0 });
+  const ha = a.hp, hb = b.hp;
+  for (let i = 0; i < 10; i++) sim.tick();
+  assert.ok(a.hp < ha - 50, "beam damages the player in its path");
+  assert.equal(b.hp, hb, "i-frames avoid the beam");
+});
+
+test("a four-player bot party defeats the Crystal Warden", () => {
+  const sim = new Sim({ runId: "warden-run", tier: 1, partySize: 4, seed: 9, boss: "warden" });
+  ["litos", "krios", "pyra", "vektor"].forEach((l, i) => sim.addPlayer(`p${i}`, `x${i}`, `B${i}`, loadoutFor(l as any, 6)));
+  sim.start();
+  for (let i = 0; i < 160 && !sim.bossKill && sim.result === "running"; i++) runBots(sim, {}, 5);
+  assert.ok(sim.bossKill, `warden killed (stage ${sim.stage}, result ${sim.result})`);
+});

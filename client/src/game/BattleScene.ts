@@ -21,6 +21,7 @@ import type { Controls } from "./controls.ts";
 import type { Hud } from "./hud.ts";
 import { LootDrops } from "./lootDrops.ts";
 import { Tips } from "./tips.ts";
+import { pylonCanvas, wardenCanvas } from "./wardenArt.ts";
 import { AnimLibrary, stripScale } from "./animations.ts";
 import { TIER_RANK } from "./crate.ts";
 import { RARITY_COLORS, type BoxTier, type LootMsg, type Rarity } from "@ef/shared";
@@ -164,6 +165,8 @@ export class BattleScene extends Phaser.Scene {
     this.offFns.push(this.room.onMessage("fx", (list: FxEvent[]) => list.forEach((f) => this.onFx(f))) as any);
     this.offFns.push(this.room.onMessage("deny", () => {}) as any);
     this.animLib.create(this);
+    if (!this.textures.exists("enemy.warden")) this.textures.addCanvas("enemy.warden", wardenCanvas());
+    if (!this.textures.exists("enemy.pylon")) this.textures.addCanvas("enemy.pylon", pylonCanvas());
     (window as any).__efScene = this;
     this.loot = new LootDrops(this, this.room.sessionId);
     this.tips = new Tips(this.hud.root, (this.room.state as any).players?.get(this.room.sessionId)?.level ?? 1);
@@ -197,7 +200,7 @@ export class BattleScene extends Phaser.Scene {
     if (me.life === "downed") this.tips.show("downed");
     if (st.pickups.size > 0) this.tips.show("pickup");
     if (st.stage === "s2_activate") this.tips.show("stabilizer");
-    if (st.stage === "s3_boss") this.tips.show("boss");
+    if (st.stage === "s3_boss") this.tips.show(st.mission === "warden" ? "warden" : "boss");
     if (me.hasOverdrive && me.od >= 100) this.tips.show("overdrive");
     this.tips.update(dt);
   }
@@ -647,8 +650,9 @@ export class BattleScene extends Phaser.Scene {
     st.enemies.forEach((enemy: any, id: string) => {
       seen.add(id);
       let view = this.enemies.get(id);
-      const painted = `enemy.${enemy.kind}.provided`;
-      const key = this.textures.exists(painted) ? painted : `enemy.${enemy.kind}`;
+      const procedural = enemy.kind === "boss" && enemy.variant === "warden" ? "enemy.warden" : enemy.kind === "pylon" ? "enemy.pylon" : "";
+      const painted = procedural ? `${procedural}.provided` : `enemy.${enemy.kind}.provided`;
+      const key = this.textures.exists(painted) ? painted : procedural || `enemy.${enemy.kind}`;
       if (!view) {
         const height = (ENEMY_DISPLAY_HEIGHT[enemy.kind] ?? 60) * (enemy.elite ? 1.2 : 1);
         const shadow = this.add.image(0, 0, "shadow").setDisplaySize(height * .9, height * .27).setDepth(-600);
@@ -730,6 +734,36 @@ export class BattleScene extends Phaser.Scene {
     st.hazards.forEach((h: any) => {
       const x = sx(h.x);
       const y = sy(h.y);
+      if (h.kind === "beam") {
+        // Crystal Warden beam: thin red guide while charging, bright sweeping beam when active.
+        const len = h.len || 500;
+        const ex = h.x + Math.cos(h.ang) * len;
+        const ey = h.y + Math.sin(h.ang) * len;
+        if (h.delay > 0) {
+          g.lineStyle(2 + 3 * pulse, 0xff4a4a, 0.55 + 0.35 * pulse);
+          g.lineBetween(x, y - 40, sx(ex), sy(ey) - 40);
+          g.lineStyle(h.r * 2, 0xff3030, 0.12);
+          g.lineBetween(x, y - 40, sx(ex), sy(ey) - 40);
+        } else {
+          g.lineStyle(h.r * 2 + 10, 0x7de8ff, 0.25);
+          g.lineBetween(x, y - 40, sx(ex), sy(ey) - 40);
+          g.lineStyle(h.r * 2, 0xbff8ff, 0.75);
+          g.lineBetween(x, y - 40, sx(ex), sy(ey) - 40);
+          g.lineStyle(4, 0xffffff, 1);
+          g.lineBetween(x, y - 40, sx(ex), sy(ey) - 40);
+          g.fillStyle(0xbff8ff, 0.35);
+          g.fillEllipse(sx(ex), sy(ey), 60, 60 * DS);
+        }
+        return;
+      }
+      if (h.kind === "shard") {
+        if (h.delay > 0) return;
+        g.fillStyle(0xbff8ff, 1);
+        g.fillTriangle(x - 6, y - 18, x + 6, y - 18, x, y - 34);
+        g.fillStyle(0x7de8ff, 0.3);
+        g.fillEllipse(x, y, 18, 8);
+        return;
+      }
       if (h.kind === "shot") {
         g.fillStyle(0xd7ff6a, 1);
         g.fillCircle(x, y - 18, 6);
@@ -775,6 +809,13 @@ export class BattleScene extends Phaser.Scene {
       const y = sy(e.y);
       g.fillStyle(0xff3a3a, 0.18 + 0.2 * pulse);
       g.lineStyle(2, 0xff5050, 0.8);
+      if (e.atk === "nova" || e.atk === "blink") {
+        // Warden charging a shard nova or a blink: contracting crystal ring.
+        const k = Math.max(0, Math.min(1, e.t / 0.9));
+        g.lineStyle(4, e.atk === "nova" ? 0x9ff3ff : 0xc9a8ff, 0.5 + 0.4 * pulse);
+        g.strokeEllipse(x, y, 120 + 220 * k, (120 + 220 * k) * DS);
+        return;
+      }
       if (e.atk === "shot") {
         const len = 320;
         const ex = e.x + Math.cos(e.ang) * len;
@@ -1004,7 +1045,11 @@ export class BattleScene extends Phaser.Scene {
       this.controls.setTheme(LINEAGE_COLORS[me.lineage as LineageId]?.glow ?? "#fff", me.lineage);
     }
     const boss = st.bossId ? st.enemies.get(st.bossId) : null;
-    this.hud.updateObjective(st.stage, st.objective, boss ? { hp: boss.hp, maxHp: boss.maxHp, stagger: boss.stagger } : null);
+    let pylons = 0;
+    st.enemies.forEach((e: any) => {
+      if (e.kind === "pylon") pylons++;
+    });
+    this.hud.updateObjective(st.stage === "s3_boss" && st.mission === "warden" ? "s3_boss_warden" : st.stage, st.objective, boss ? { hp: boss.hp, maxHp: boss.maxHp, stagger: boss.stagger, name: t(boss.variant === "warden" ? "boss_name_warden" : "boss_name"), shielded: pylons > 0 && boss.variant === "warden" } : null);
     const team: any[] = [];
     st.players.forEach((p: any, id: string) => {
       if (id !== this.room.sessionId) team.push({ id, name: p.name, lineage: p.lineage, hp: p.hp, maxHp: p.maxHp, life: p.life, connected: p.connected });

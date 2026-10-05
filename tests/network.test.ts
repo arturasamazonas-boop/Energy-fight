@@ -150,3 +150,17 @@ test("leader leaving the lobby transfers leadership", async () => {
   await waitFor(() => bots[1].state.leaderId === second, 3000, "leader transfer");
   await closeAll(bots.slice(1));
 });
+
+test("leader chooses the mission; only the leader can change it", async () => {
+  const bots = await lobby(2);
+  bots[1].room.send("mission", { mission: "warden" });
+  await sleep(300);
+  assert.equal(bots[0].state.mission, "brood", "non-leader cannot change the mission");
+  bots[0].room.send("mission", { mission: "nonsense" });
+  bots[0].room.send("mission", { mission: "warden" });
+  await waitFor(() => bots[1].state.mission === "warden", 3000, "mission synced");
+  await startRun(bots);
+  const server = matchMaker.getLocalRoomById(bots[0].room.roomId) as any;
+  assert.equal(server.sim.opts.boss, "warden");
+  await closeAll(bots);
+});

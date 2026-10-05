@@ -19,7 +19,8 @@ export function renderLobby(root: HTMLElement, room: Room, profile: ProfileView,
         </section>
         <section class="mission-panel">
           <div class="mission-art"><span class="mission-location">${UI_COPY.station}</span><span class="mission-duration">${UI_COPY.expeditionTime}</span></div>
-          <div class="mission-brief"><span class="eyebrow">${UI_COPY.expedition}</span><h2>${UI_COPY.missionName}</h2><p class="small">${UI_COPY.missionDescription}</p></div>
+          <div class="mission-brief"><span class="eyebrow">${UI_COPY.expedition}</span><h2 class="mission-title"></h2><p class="small mission-desc"></p></div>
+          <div class="missions">${["brood", "warden"].map((m) => `<button class="mission-pick" data-m="${m}"><b>${t("mission_" + m)}</b><small>${t("boss_" + m)}</small></button>`).join("")}</div>
           <div class="tiers"></div>
           <p class="small carry"></p>
           <h3>${t("lineage")}</h3>
@@ -56,6 +57,7 @@ export function renderLobby(root: HTMLElement, room: Room, profile: ProfileView,
     b.onclick = () => room.send("lineage", { lineage: id });
     lpick.appendChild(b);
   }
+  root.querySelectorAll<HTMLButtonElement>(".mission-pick").forEach((b) => (b.onclick = () => room.send("mission", { mission: b.dataset.m })));
   const tiers = $(".tiers");
   for (const ts of TIERS) {
     const b = document.createElement("button");
@@ -95,6 +97,13 @@ export function renderLobby(root: HTMLElement, room: Room, profile: ProfileView,
       $(".plist").innerHTML = nextRoster;
       rosterSignature = nextRoster;
     }
+    const mission = st.mission || "brood";
+    $(".mission-title").textContent = t("mission_" + mission);
+    $(".mission-desc").textContent = t("mission_" + mission + "_desc");
+    root.querySelectorAll<HTMLButtonElement>(".mission-pick").forEach((b) => {
+      b.classList.toggle("on", b.dataset.m === mission);
+      b.disabled = !isLeader && b.dataset.m !== mission;
+    });
     tiers.querySelectorAll<HTMLButtonElement>(".tier").forEach((b) => {
       const tier = Number(b.dataset.tier);
       b.classList.toggle("on", st.tier === tier);

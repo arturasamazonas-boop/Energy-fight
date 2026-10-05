@@ -54,7 +54,9 @@ export function botDecide(v: BotView, opts: BotOptions = {}, t = 0): BotDecision
   }
   let nearest: BotView["enemies"][number] | null = null;
   let nd = Infinity;
-  for (const e of v.enemies) {
+  // Shield pylons first: the shielded boss takes almost no damage while they stand.
+  const pylons = v.enemies.filter((e) => e.kind === "pylon");
+  for (const e of pylons.length ? pylons : v.enemies) {
     const d = Math.hypot(e.x - s.x, e.y - s.y);
     if (d < nd) {
       nd = d;

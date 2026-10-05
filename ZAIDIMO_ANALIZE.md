@@ -30,6 +30,6 @@
 
 1. **Animacijų piešiniai.** Grojimas jau paruoštas, trūksta pačių ChatGPT kadrų juostų. Tai didžiausias žingsnis iki „nerealiai gražu“.
 2. **Misijos tempas.** Pailginta, bet reikia gyvo žaidimo testo, ar tempas jaučiasi gerai.
-3. **Turinys.** Yra vienas žemėlapis ir vienas bosas. Kitas žingsnis: antras bosas su kitokia mechanika ir dienos iššūkis su garantuota bent auksine dėže.
+3. **Turinys.** Pridėtas antras bosas **Kristalų Valdovas** (misija „Kristalų šerdis“): piliarų skydas, besisukantys lazeriai, šukių novos ir teleportacija. Liko: atskiras žemėlapis antram bosui, dienos iššūkis su garantuota bent auksine dėže, tikri Valdovo piešiniai.
 4. **Garsas.** Garsai kol kas sintetiniai. Reikia tikrų smūgių, dėžių atidarymo garsų ir muzikos.
 5. **Telefonų našumas.** Kadrų dažnis tikruose telefonuose dar nematuotas.

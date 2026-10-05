@@ -160,4 +160,4 @@ export function characterDisplayHeight(lineage: LineageId, level: number, evolut
   return base * growth * (evolution ? 1.08 : 1);
 }
 
-export const ENEMY_DISPLAY_HEIGHT: Record<string, number> = { pursuer: 43, ranged: 61, armored: 77, support: 60, boss: 158 };
+export const ENEMY_DISPLAY_HEIGHT: Record<string, number> = { pursuer: 43, ranged: 61, armored: 77, support: 60, boss: 158, pylon: 96 };

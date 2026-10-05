@@ -8,6 +8,7 @@ import {
   buildLoadout,
   carryMultiplier,
   isLineage,
+  BOSS_VARIANTS,
   gearScore,
   impactScores,
   rollBoxContents,
@@ -91,6 +92,10 @@ export class GameRoom extends Room {
     this.onMessage("lineage", (client, m: any) => this.onLineage(client, m));
     this.onMessage("ready", (client, m: any) => this.onReady(client, m));
     this.onMessage("tier", (client, m: any) => this.onTier(client, m));
+    this.onMessage("mission", (client, m: any) => {
+      if (this.state.phase !== "lobby" || client.sessionId !== this.state.leaderId) return;
+      if ((BOSS_VARIANTS as readonly string[]).includes(m?.mission)) this.state.mission = m.mission;
+    });
     this.onMessage("start", (client) => this.onStart(client).catch((e) => this.fail(client, e)));
     this.onMessage("input", (client, m) => this.onInput(client, m));
     this.onMessage("action", (client, m) => this.onAction(client, m));
@@ -218,7 +223,7 @@ export class GameRoom extends Room {
     // Snapshot every participant's loadout from the database at run start.
     const runId = randomUUID();
     const participants = [...this.seats.values()].filter((s) => this.state.players.get(s.sessionId)?.connected);
-    const sim = new Sim({ runId, tier: this.state.tier, partySize: participants.length });
+    const sim = new Sim({ runId, tier: this.state.tier, partySize: participants.length, boss: this.state.mission as any });
     for (const seat of participants) {
       const profile = await this.svc.profiles.getProfile(seat.profileId);
       if (!profile) continue;
@@ -473,7 +478,7 @@ export class GameRoom extends Room {
           box: seat.box,
         });
       }
-      this.results = { runId: this.state.runId, success, tier: this.state.tier, durationSec: Math.round((Date.now() - this.startedAt) / 1000), players };
+      this.results = { runId: this.state.runId, mission: this.state.mission, success, tier: this.state.tier, durationSec: Math.round((Date.now() - this.startedAt) / 1000), players };
       this.broadcast("results", this.results);
       await this.svc.profiles.recordRunEnd(this.state.runId, success ? "success" : "failed").catch(() => {});
     });
@@ -536,6 +541,7 @@ export class GameRoom extends Room {
       s.phase = e.phase;
       s.stagger = e.kind === "boss" ? Math.min(1, e.stagger / e.staggerThreshold) : 0;
       s.elite = e.elite;
+      s.variant = e.variant;
     });
     syncMap(st.hazards, sim.hazards, HazardS, (s, h) => {
       s.id = h.id;
@@ -546,6 +552,8 @@ export class GameRoom extends Room {
       s.r = h.r;
       s.delay = h.delay;
       s.life = h.life;
+      s.ang = h.ang ?? 0;
+      s.len = h.len ?? 0;
     });
     syncMap(st.pickups, sim.pickups, PickupS, (s, k) => {
       s.id = k.id;

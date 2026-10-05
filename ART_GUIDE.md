@@ -147,3 +147,13 @@ The game plays animation strips automatically when they are present:
 | Enemies | `idle`, `move`/`walk`, `windup` (and `sweep_windup`/`strike_cast` for the boss), `attack`/`shoot`/`slam`/`sweep`, `hurt`, `channel`, `stagger`, `roar`, `death` |
 
 Missing animations fall back to the next suitable one. A form without strips keeps its illustration.
+
+## Second boss: Crystal Warden (placeholder is procedural)
+
+The Crystal Warden and its shield pylons are currently drawn in code (`client/src/game/wardenArt.ts`). Copyable prompts for replacement art:
+
+> Single full-body illustration of an original boss creature for a mobile 2.5D co-op action game, transparent background (PNG with alpha), no ground shadow. "Crystal Warden": a massive, slow guardian colossus made of dark basalt plates, with huge pale-cyan crystal spikes on its shoulders and forearms ending in crystal blades. A floating halo of crystal shards hovers behind its head, and a glowing violet energy core sits in its chest. It is serious and ancient, not cute. Facing right, elevated three-quarter view from about 35° above, key light from the upper left. Strong silhouette readable at 160 px tall. Feet fully visible, generous empty margin. No text, no logo.
+
+> Single object illustration on a transparent background: "Crystal pylon", a shield-generating obelisk of pale-cyan crystal rising from a small dark stone base, with smaller crystal shards around it and a glowing violet rune in the centre. Same art style, camera and lighting as the Crystal Warden. Readable at 100 px tall. No text.
+
+Expected files: `art-source/illustrated/enemy_warden.png` and `art-source/illustrated/prop_pylon.png`. They need to be wired into `client/src/game/artwork.ts` (one line each) once delivered. For animation strips, use the ids `enemy_warden` (idle, walk, beam_windup, nova, blink, roar, stagger, death) and `enemy_pylon` (idle, death).

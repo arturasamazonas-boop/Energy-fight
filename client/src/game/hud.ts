@@ -86,13 +86,20 @@ export class Hud {
     this.bar("od", p.odT > 0 ? p.odT / 8 : p.od / 100);
   }
 
-  updateObjective(stage: string, objective: number, boss: { hp: number; maxHp: number; stagger: number } | null) {
+  updateObjective(stage: string, objective: number, boss: { hp: number; maxHp: number; stagger: number; name?: string; shielded?: boolean } | null) {
     const title = t(`obj_${stage}`);
     if (this.els["obj-text"].textContent !== title) this.els["obj-text"].textContent = title;
     this.els["hud-section"].textContent = `0${stage.match(/^s(\d)/)?.[1] ?? "3"} / 03`;
     this.bar("obj", objective / 100);
     this.els["boss"].classList.toggle("hidden", !boss);
-    if (boss) { this.bar("bosshp", boss.hp / Math.max(1, boss.maxHp)); this.bar("stag", boss.stagger); }
+    if (boss) {
+      this.bar("bosshp", boss.hp / Math.max(1, boss.maxHp));
+      this.bar("stag", boss.stagger);
+      const nameEl = this.root.querySelector(".boss-name") as HTMLElement;
+      const label = boss.shielded ? `${boss.name ?? t("boss_name")} · ${t("boss_shielded")}` : boss.name ?? t("boss_name");
+      if (nameEl.textContent !== label) nameEl.textContent = label;
+      this.els["boss"].classList.toggle("shielded", !!boss.shielded);
+    }
   }
 
   updateTeam(list: { id: string; name: string; lineage: string; hp: number; maxHp: number; life: string; connected: boolean }[]) {

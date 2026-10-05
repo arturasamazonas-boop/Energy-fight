@@ -92,3 +92,12 @@ A window counts as able-to-act if the body was alive for at least half of it. A 
   - `lineage_progress.equipment` maps slot to item id.
   - Over 150 items, the weakest unequipped ones are salvaged automatically.
 - **API:** `GET /api/inventory`, `POST /api/boxes/open`, `POST /api/items/equip`, `POST /api/items/dismantle`. `POST /api/dev/box` exists only with dev tools enabled.
+
+## Second boss: Crystal Warden (mission "Kristalų šerdis")
+
+- The leader picks the mission in the lobby (`state.mission`: `brood` = Motininė masė, `warden` = Kristalų Valdovas). Sections 1–2 are shared; section 3 spawns the chosen boss. Rewards, crates and tiers work the same way.
+- **Shield pylons:** 3 pylons (party-scaled HP) stand around the arena. While any stands, the Warden takes 85% less damage. Breaking the last one staggers it for 3.5 s (+25% damage taken). Phase 2 (50% HP) raises the pylons again.
+- **Beam:** a 1.2 s red guide line, then a 2.6 s rotating beam (540 long, 34 wide). It damages every tick, and dodge i-frames pass through it. In phase 2 two opposite beams spin faster.
+- **Shard nova:** a ring of 10 crystal shards (phase 2: two rings of 14, offset). **Blink** (phase 2) teleports at least 260 units away from every player and fires a small nova on arrival.
+- The Warden is immune to pulls and knockback, and its slow is capped at 20%, like the first boss.
+- Bot runs: a 4-player tier-1 party and a level-11 tier-2 party clear it, with a boss fight of about 1.5–2 min when pylons are focused first. Solo bots at level 7 usually win. Bots cannot dodge the beam, so humans should do better.

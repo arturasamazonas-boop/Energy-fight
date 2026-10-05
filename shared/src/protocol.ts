@@ -116,6 +116,7 @@ export interface LootMsg {
 
 export interface ResultsMsg {
   runId: string;
+  mission: string;
   success: boolean;
   tier: number;
   durationSec: number;

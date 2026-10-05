@@ -3,6 +3,8 @@
 // Colyseus schema after every tick. Tests drive it headlessly.
 import {
   ACTIVITY,
+  WARDEN,
+  type BossVariant,
   BOSS,
   ENEMY_CAP,
   ENEMY_SPECS,
@@ -108,11 +110,12 @@ export interface SimEnemy {
   bossCombo: string[];
   elite: EliteAffix | "";
   lastHitT: number;
+  variant: BossVariant | "";
 }
 
 export interface Hazard {
   id: string;
-  kind: "scorch" | "frost" | "strike" | "pool" | "aftershock" | "shot" | "slam";
+  kind: "scorch" | "frost" | "strike" | "pool" | "aftershock" | "shot" | "slam" | "beam" | "shard";
   side: "player" | "enemy";
   ownerId: string;
   x: number;
@@ -126,6 +129,9 @@ export interface Hazard {
   vy: number;
   stagger: number;
   hitOnce: boolean;
+  ang?: number; // beams: current angle
+  len?: number; // beams: length
+  spin?: number; // beams: angular speed (rad/s)
 }
 
 export interface Pickup {
@@ -151,6 +157,7 @@ export interface SimOptions {
   tier: number;
   partySize: number;
   seed?: number;
+  boss?: BossVariant;
 }
 
 export interface SectionClear {
@@ -647,7 +654,7 @@ export class Sim {
 
     if (spec.pull) {
       for (const e of this.enemies.values()) {
-        if (e.kind === "boss") continue;
+        if (e.kind === "boss" || e.kind === "pylon") continue;
         const d = dist(cx, cy, e.x, e.y);
         if (d > spec.pull.radius || d < 4) continue;
         const move = Math.min(spec.pull.strength, d - 20);
@@ -781,6 +788,8 @@ export class Sim {
       raw *= LOOT.critMultiplier;
     }
     if (this.has(p, "firstStrike") && e.hp > e.maxHp * 0.9) raw *= 1 + SPECIAL_VALUES.firstStrike;
+    // The Crystal Warden is shielded while any pylon stands.
+    if (e.variant === "warden" && this.pylonsAlive() > 0) raw *= 1 - WARDEN.shieldReduction;
     const dmg = Math.max(1, Math.round(raw * (1 - armor) * taken));
     e.hp = Math.max(0, e.hp - dmg);
     p.stats.damage += dmg;
@@ -813,7 +822,7 @@ export class Sim {
         this.clearBossHazards(e);
         p.stats.controlSeconds += BOSS.staggerDuration;
       }
-    } else {
+    } else if (e.kind !== "pylon") {
       const heavy = e.kind === "armored";
       if (heavy) {
         if (e.stagger >= e.staggerThreshold) {
@@ -857,6 +866,16 @@ export class Sim {
     this.fx.push({ t: "death", id: e.id, kind: e.kind, x: e.x, y: e.y });
     if (this.stage === "s2_defend") this.objective = Math.min(100, this.objective + 2.1);
     if (e.kind === "boss") this.onBossDead(e);
+    if (e.kind === "pylon" && this.pylonsAlive() === 0) {
+      const w = this.bossId ? this.enemies.get(this.bossId) : null;
+      if (w && w.variant === "warden") {
+        w.state = "stagger";
+        w.t = WARDEN.exposedStagger;
+        w.attack = null;
+        this.clearBossHazards(w);
+        this.fx.push({ t: "msg", key: "warden_exposed" });
+      }
+    }
   }
 
   // ---- damage to players -----------------------------------------------------
@@ -983,7 +1002,7 @@ export class Sim {
       this.spawnQueue.push({ kind, x, y, required, elite });
       return;
     }
-    const spec = ENEMY_SPECS[kind];
+    const spec = kind === "boss" && this.opts.boss === "warden" ? (WARDEN.spec as EnemySpec) : ENEMY_SPECS[kind];
     const affix: EliteAffix | "" = elite && kind !== "boss" ? ELITE_AFFIXES[Math.floor(this.rng() * ELITE_AFFIXES.length)] : "";
     const hp = Math.round(spec.hp * (kind === "boss" ? this.hpMult.boss : this.hpMult.regular) * (affix ? ELITE.hp : 1));
     const id = `e${this.nextId++}`;
@@ -1015,6 +1034,7 @@ export class Sim {
       bossCombo: [],
       elite: affix,
       lastHitT: 0,
+      variant: kind === "boss" ? (this.opts.boss ?? "brood") : "",
     };
     this.enemies.set(id, e);
     if (kind === "boss") this.bossId = id;
@@ -1097,7 +1117,8 @@ export class Sim {
     if (e.elite === "regen" && this.time - e.lastHitT > ELITE.regenDelay && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + Math.ceil(e.maxHp * ELITE.regenPerSecond * DT));
     e.stagger = Math.max(0, e.stagger - DT * (e.kind === "boss" ? 6 : 10));
 
-    if (e.kind === "boss") return this.tickBoss(e);
+    if (e.kind === "pylon") return;
+    if (e.kind === "boss") return e.variant === "warden" ? this.tickWarden(e) : this.tickBoss(e);
 
     const target = this.nearestPlayer(e.x, e.y);
     e.target = target?.id ?? null;
@@ -1302,8 +1323,123 @@ export class Sim {
     }
   }
 
+  private pylonsAlive() {
+    let n = 0;
+    for (const e of this.enemies.values()) if (e.kind === "pylon") n++;
+    return n;
+  }
+
+  private spawnPylons() {
+    const ar = MAP.sections[2].arena;
+    const cx = ar.x + ar.w / 2;
+    const cy = ar.y + ar.h / 2;
+    const existing = this.pylonsAlive();
+    for (let i = existing; i < WARDEN.pylons; i++) {
+      const a = -Math.PI / 2 + (i * 2 * Math.PI) / WARDEN.pylons;
+      const p = this.spawn("pylon", cx + Math.cos(a) * WARDEN.pylonRadius, cy + Math.sin(a) * WARDEN.pylonRadius * 0.75);
+      if (p) {
+        p.state = "idle";
+        p.t = 9999;
+      }
+    }
+    this.fx.push({ t: "msg", key: "warden_shield" });
+  }
+
+  // ---- second boss: Crystal Warden -----------------------------------------------
+  private tickWarden(e: SimEnemy) {
+    const W = WARDEN;
+    if (!e.reinforced) {
+      e.reinforced = 1; // first tick: raise the pylons
+      this.spawnPylons();
+    }
+    const hpFrac = e.hp / e.maxHp;
+    if (e.phase === 1 && hpFrac <= W.phase2At) {
+      e.phase = 2;
+      e.state = "roar";
+      e.t = 1.4;
+      e.attack = null;
+      this.clearBossHazards(e);
+      this.spawnPylons();
+      this.fx.push({ t: "msg", key: "warden_phase2" });
+    }
+    const target = this.nearestPlayer(e.x, e.y);
+    e.target = target?.id ?? null;
+    if (e.state === "roar" || e.state === "stagger" || e.state === "recover" || e.state === "flinch") {
+      e.t -= DT;
+      if (e.t <= 0) e.state = "move";
+      return;
+    }
+    if (e.state === "windup") {
+      e.t -= DT * (1 - this.slowOf(e) * 0.5);
+      if (e.t <= 0) this.wardenStrike(e);
+      return;
+    }
+    if (!target) return;
+    const d = dist(e.x, e.y, target.x, target.y);
+    this.faceTo(e, target.x, target.y);
+    if (d > 330) this.moveEnemy(e, target.x, target.y);
+    else if (d < 150) this.moveEnemy(e, e.x - (target.x - e.x), e.y - (target.y - e.y), 0.7);
+    if (e.cd > 0) return;
+    if (!e.bossCombo.length) e.bossCombo = e.phase === 1 ? ["beam", "nova"] : ["beam", "blink", "nova", "nova"];
+    const next = e.bossCombo.shift()!;
+    const ang = angleOf(target.x - e.x, target.y - e.y);
+    e.state = "windup";
+    e.attack = { kind: next, ang, tx: target.x, ty: target.y };
+    if (next === "beam") {
+      e.t = W.beam.windup;
+      const spin = (this.rng() < 0.5 ? -1 : 1) * W.beam.spin * (e.phase === 2 ? 1.15 : 1);
+      const beams = e.phase === 2 ? [ang, ang + Math.PI] : [ang];
+      for (const a of beams) {
+        this.addHazard({ kind: "beam", side: "enemy", ownerId: e.id, x: e.x, y: e.y, r: W.beam.width / 2, delay: W.beam.windup, life: W.beam.duration, dps: e.spec.damage * W.beam.dps * this.dmgMult, slow: 0, stagger: 0, hitOnce: false, ang: a, len: W.beam.length, spin });
+      }
+    } else if (next === "nova") e.t = W.nova.windup;
+    else e.t = W.blink.windup;
+  }
+
+  private wardenStrike(e: SimEnemy) {
+    const W = WARDEN;
+    const a = e.attack;
+    e.attack = null;
+    e.state = "recover";
+    e.t = e.spec.recover * (e.phase === 2 ? 0.7 : 1);
+    e.cd = e.spec.cooldown * (e.phase === 2 ? 0.75 : 1);
+    if (!a) return;
+    if (a.kind === "beam") {
+      e.t = W.beam.duration * 0.85; // stands still while the beam sweeps
+      return;
+    }
+    if (a.kind === "blink") {
+      const ar = MAP.sections[2].arena;
+      for (let i = 0; i < 16; i++) {
+        const x = ar.x + 120 + this.rng() * (ar.w - 240);
+        const y = ar.y + 80 + this.rng() * (ar.h - 160);
+        let ok = true;
+        for (const p of this.players.values()) if (p.life === "alive" && dist(p.x, p.y, x, y) < W.blink.minDistance) ok = false;
+        if (ok || i === 15) {
+          e.x = x;
+          e.y = y;
+          break;
+        }
+      }
+      this.fx.push({ t: "msg", key: "warden_blink" });
+      this.wardenNova(e, 6, 0);
+      return;
+    }
+    this.wardenNova(e, e.phase === 2 ? W.nova.shotsPhase2 : W.nova.shots, 0);
+    if (e.phase === 2) this.wardenNova(e, W.nova.shotsPhase2, 0.45, Math.PI / W.nova.shotsPhase2);
+  }
+
+  private wardenNova(e: SimEnemy, count: number, delay: number, offset = 0) {
+    const W = WARDEN;
+    const base = this.rng() * Math.PI * 2 + offset;
+    for (let i = 0; i < count; i++) {
+      const a = base + (i * 2 * Math.PI) / count;
+      this.addHazard({ kind: "shard", side: "enemy", ownerId: e.id, x: e.x, y: e.y, r: 12, delay, life: 2.6, dps: e.spec.damage * W.nova.damage * this.dmgMult, slow: 0, vx: Math.cos(a) * W.nova.speed, vy: Math.sin(a) * W.nova.speed, stagger: 0, hitOnce: true });
+    }
+  }
+
   private clearBossHazards(e: SimEnemy) {
-    for (const [id, h] of this.hazards) if (h.ownerId === e.id && h.kind === "strike" && h.delay > 0.3) this.hazards.delete(id);
+    for (const [id, h] of this.hazards) if (h.ownerId === e.id && ((h.kind === "strike" && h.delay > 0.3) || h.kind === "beam")) this.hazards.delete(id);
   }
 
   /** Set when the boss dies: who was there and how much they contributed (for loot crates). */
@@ -1340,12 +1476,12 @@ export class Sim {
         const push = (min - d) / 2;
         const nx = (b.x - a.x) / d;
         const ny = (b.y - a.y) / d;
-        if (a.kind !== "boss") {
+        if (a.kind !== "boss" && a.kind !== "pylon") {
           const m = moveOnGround(a.x, a.y, -nx * push, -ny * push, this.maxX, a.spec.radius * 0.6);
           a.x = m.x;
           a.y = m.y;
         }
-        if (b.kind !== "boss") {
+        if (b.kind !== "boss" && b.kind !== "pylon") {
           const m = moveOnGround(b.x, b.y, nx * push, ny * push, this.maxX, b.spec.radius * 0.6);
           b.x = m.x;
           b.y = m.y;
@@ -1367,7 +1503,28 @@ export class Sim {
         if (h.delay > 0) continue;
         // becomes active
       }
-      if (h.kind === "shot") {
+      if (h.kind === "beam") {
+        const owner = this.enemies.get(h.ownerId);
+        if (owner) {
+          h.x = owner.x;
+          h.y = owner.y;
+        }
+        h.ang = (h.ang ?? 0) + (h.spin ?? 0) * DT;
+        const dx = Math.cos(h.ang);
+        const dy = Math.sin(h.ang);
+        for (const p of this.players.values()) {
+          if (p.life !== "alive" || p.iframes > 0) continue;
+          const rx = p.x - h.x;
+          const ry = p.y - h.y;
+          const along = rx * dx + ry * dy;
+          const perp = Math.abs(-rx * dy + ry * dx);
+          if (along > 0 && along < (h.len ?? 0) && perp <= h.r + 14) this.damagePlayerTick(p, h.dps * DT);
+        }
+        h.life -= DT;
+        if (h.life <= 0 || !owner) this.hazards.delete(id);
+        continue;
+      }
+      if (h.kind === "shot" || h.kind === "shard") {
         h.x += h.vx * DT;
         h.y += h.vy * DT;
         let hit = false;

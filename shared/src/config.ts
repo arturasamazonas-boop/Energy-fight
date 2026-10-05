@@ -400,7 +400,9 @@ export const MODULE_UPGRADE_COST = [15, 35, 60]; // salvage cost for rank 1,2,3
 export const UNLOCKS = { skill2: 3, overdrive: 5, evolution: 10, modifier: 15, mastery: 20 } as const;
 
 // ---- Enemies ---------------------------------------------------------------
-export type EnemyKind = "pursuer" | "ranged" | "armored" | "support" | "boss";
+export type EnemyKind = "pursuer" | "ranged" | "armored" | "support" | "boss" | "pylon";
+export type BossVariant = "brood" | "warden";
+export const BOSS_VARIANTS: BossVariant[] = ["brood", "warden"];
 
 export interface EnemySpec {
   kind: EnemyKind;
@@ -423,6 +425,7 @@ export const ENEMY_SPECS: Record<EnemyKind, EnemySpec> = {
   armored: { kind: "armored", hp: 260, speed: 62, radius: 22, damage: 20, armor: 0.45, attackRange: 70, windup: 0.85, recover: 0.9, cooldown: 2.2, staggerThreshold: 45, slowCap: 0.5 },
   support: { kind: "support", hp: 110, speed: 70, radius: 17, damage: 6, armor: 0, attackRange: 0, windup: 2.0, recover: 1.0, cooldown: 7, staggerThreshold: 15, slowCap: 0.6 },
   boss: { kind: "boss", hp: 3000, speed: 70, radius: 46, damage: 20, armor: 0.1, attackRange: 170, windup: 0.95, recover: 0.9, cooldown: 1.6, staggerThreshold: 160, slowCap: 0.2 },
+  pylon: { kind: "pylon", hp: 220, speed: 0, radius: 24, damage: 0, armor: 0, attackRange: 0, windup: 1, recover: 1, cooldown: 99, staggerThreshold: 99999, slowCap: 0 },
 };
 
 export const BOSS = {
@@ -437,6 +440,19 @@ export const BOSS = {
   staggerDamageTaken: 0.25,
   staggerThresholdGrowth: 1.35,
   pools: { max: 4, every: 7, radius: 60, duration: 12, dps: 6 },
+} as const;
+
+/** Second boss: the Crystal Warden. Shielded by pylons; beams, shard novas and blinks. */
+export const WARDEN = {
+  spec: { kind: "boss" as const, hp: 2200, speed: 48, radius: 44, damage: 18, armor: 0.1, attackRange: 520, windup: 1.2, recover: 1.0, cooldown: 1.8, staggerThreshold: 180, slowCap: 0.2 },
+  shieldReduction: 0.85, // damage reduction while any pylon stands
+  pylons: 3,
+  pylonRadius: 300, // distance of pylons from the arena centre
+  exposedStagger: 3.5, // seconds staggered when the last pylon breaks
+  beam: { windup: 1.2, duration: 2.6, length: 540, width: 34, spin: 0.85, dps: 1.6 }, // dps × boss damage
+  nova: { windup: 0.9, shots: 10, shotsPhase2: 14, speed: 230, damage: 0.8 },
+  blink: { windup: 0.6, minDistance: 260 },
+  phase2At: 0.5,
 } as const;
 
 export const SUPPORT = { channelSeconds: 2.0, maxChannels: 3, spawnPerChannel: 2, interruptDamageFraction: 0.12 } as const;

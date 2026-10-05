@@ -57,6 +57,7 @@ export class EnemyS extends Schema {
   @type("uint8") phase = 1;
   @type("float32") stagger = 0; // 0..1 of threshold (boss bar)
   @type("string") elite = "";
+  @type("string") variant = "";
 }
 
 export class HazardS extends Schema {
@@ -68,6 +69,8 @@ export class HazardS extends Schema {
   @type("float32") r = 0;
   @type("float32") delay = 0;
   @type("float32") life = 0;
+  @type("float32") ang = 0;
+  @type("float32") len = 0;
 }
 
 export class PickupS extends Schema {
@@ -81,6 +84,7 @@ export class GameState extends Schema {
   @type("string") code = "";
   @type("string") leaderId = "";
   @type("uint8") tier = 1;
+  @type("string") mission = "brood";
   @type("string") runId = "";
   @type("string") stage = "";
   @type("uint8") section = 1;
