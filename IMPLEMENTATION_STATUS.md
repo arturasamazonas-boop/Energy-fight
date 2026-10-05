@@ -1,6 +1,8 @@
 # Implementation status
 
-Last updated: 2026-10-04. Version: 0.1.0 (prototype).
+Last updated: 2026-10-05. Version: 0.1.0 (prototype, illustrated graphics update).
+
+The new graphics are implemented and pass the automated checks listed below. Browser screenshots and physical-phone validation of this graphics version are still pending. The earlier prototype's browser results are preserved separately as historical evidence.
 
 ## Milestones
 
@@ -9,7 +11,8 @@ Last updated: 2026-10-04. Version: 0.1.0 (prototype).
 | A: networking loop (room, two clients, shared enemy) | Done and verified |
 | B: playable mission (4 lineages, controls, 4 enemy roles, 3 sections, boss, downed/revive/checkpoint, results) | Done; balance not tuned with humans |
 | C: growth (guest profiles, per-lineage progress, unlocks, evolution, modifiers, modules, tiers, carry XP, reward ledger) | Done and verified |
-| D: 8 connections, reconnect/reload, phone layout, settings, asset workflow, acceptance checks | Done in automation and emulation. **No physical-device test yet.** |
+| D: 8 connections, reconnect/reload, phone layout, settings, asset workflow, acceptance checks | Network automation passes. Earlier prototype was emulated; the new illustrated layout still needs browser/device review. |
+| E: illustrated world and interface | 23 paintings integrated across characters, enemies, scenery, objects and UI; source validation passes. |
 
 ## Implemented
 
@@ -30,7 +33,7 @@ Last updated: 2026-10-04. Version: 0.1.0 (prototype).
   - support marks and results
 - Persistence: PostgreSQL (Neon in production) or embedded PGlite locally, with migrations, a reward ledger and runs. Guest credentials are random and stored hashed.
 - Client:
-  - Phaser 4 renderer with procedural characters, enemies and environment, the oblique projection with foot depth sorting and shadows, telegraphs and hit feedback
+  - Phaser 4 renderer with illustrated characters, enemies, scenery and objects; projected walkable-floor composition, foot depth sorting and shadows, telegraphs and elemental hit feedback
   - teammate direction markers, local movement prediction with reconciliation, and smoothing for remote entities
   - DOM HUD, multi-touch controls with safe areas, the rotate overlay and the keyboard fallback
   - lab (evolution before/after silhouettes with confirmation, modifiers, modules), lobby and results that highlight carry XP, pending unlocks and support
@@ -38,7 +41,23 @@ Last updated: 2026-10-04. Version: 0.1.0 (prototype).
 - Asset replacement through `ASSET_MANIFEST.json` and `npm run assets:validate`; `ART_GUIDE.md` with ChatGPT prompts.
 - Deployment: `render.yaml` (Render free + Neon), `Dockerfile` with Caddy notes for Oracle Always Free.
 
-## Verification performed (commands actually run)
+## Current graphics update verification (2026-10-05)
+
+| Check | How | Result |
+| --- | --- | --- |
+| Typecheck | `npm run typecheck` | pass; repeated after final UI fixes |
+| Config validation | `node --import tsx scripts/validate-config.ts` | pass |
+| Production build | `npm run build` | pass; repeated after final UI fixes |
+| Automated tests | `npm test` | **53 pass, 0 fail, 0 skipped**, including the eight-client mission |
+| Supplied image inventory | `node --import tsx scripts/validate-assets.ts` | **23/23 PNGs pass** |
+| Asset validation tests | `node --import tsx --test tests/assets.test.ts` | **6/6 pass**; included in the full test suite above |
+| Built-client and real PGlite server HTTP checks | HTML, JS, CSS, four base images, boss, arena, floor, guest creation and profile | **12/12 pass** |
+| Source review | Controls, modal touch scrolling, mobile text/contrast, names, alpha pivots, loader lifecycle and GPU upload | Identified issues fixed and typechecked |
+| Browser rendering | Official Chromium and headless shell | **Blocked:** native browser exits with `SIGTRAP` before opening the application; no new gameplay screenshot or browser E2E pass is claimed |
+
+## Earlier prototype verification (recorded 2026-10-04)
+
+The following table is retained from the original repository. Its browser, latency, PostgreSQL 16 and benchmark results were not repeated as part of the illustrated graphics update and do not verify the new layout.
 
 | Check | How | Result |
 | --- | --- | --- |
@@ -64,10 +83,10 @@ Last updated: 2026-10-04. Version: 0.1.0 (prototype).
 
 ## Not verified / known limits
 
-- **No physical Android or iPhone test.** Frame rate, touch feel, Safari safe areas and audio unlock on real devices are unmeasured. The headless runs used software WebGL, so they say nothing about device performance.
+- **No physical Android or iPhone test.** Frame rate, touch feel, Safari safe areas and audio unlock on real devices are unmeasured. The illustrated version also lacks a completed browser-rendering pass because the available browser exits before application load. Earlier headless runs used software WebGL and do not establish device performance.
 - **No real hosting yet.** Render + Neon deployment, free-tier CPU under 8 players and real internet latency are unmeasured.
 - **Balance is untuned.** Bot runs suggest tier 1 takes roughly 4–6 minutes of sim time for appropriately levelled bots; humans will differ. The 10–15 minute target has **not** been confirmed. Solo bots at level 5 sometimes lose the boss (VEKTOR most often). Tier 2/3 solo at the recommended level is hard for bots.
-- The procedural art is a single mirrored pose per lineage/evolution, with no directional or frame animation yet.
+- Each supplied character/enemy illustration contains one mirrored pose with runtime motion and effects. Separate directional or hand-painted animation frames are not supplied.
 - Prediction covers movement and dodge only. Dash-cut and pulls are corrected by reconciliation, which can cause a visible snap at high latency.
 - Active missions do not survive a server restart or Render spin-down (by design). Committed section rewards do.
 - Guest recovery depends on browser storage; there is no cross-device login.
@@ -76,5 +95,5 @@ Last updated: 2026-10-04. Version: 0.1.0 (prototype).
 
 1. Deploy to Render with a Neon `DATABASE_URL` (see DEPLOY.md), then play one real session on two phones and note FPS, feel and latency.
 2. Human-playtest tier 1 with a strong and a weak player. Tune `ENEMY_SPECS`, the wave lists in `sim.ts` and `TIERS` for the 10–15 minute target.
-3. Generate the PYRA base reference with ART_GUIDE prompt 2, then wire the first provided sprite.
+3. Review the illustrated version on real phones, including eight-player readability, feet alignment, modal scrolling, loading time and memory.
 4. Add directional and frame animation playback once real sprite sheets exist.

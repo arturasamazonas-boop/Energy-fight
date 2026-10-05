@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Piešinių galerija · Energy Fight</title>
+<style>
+:root{--paper:#f3ede1;--ink:#263b33;--muted:#657264;--line:#d8cfbc;--gold:#b69b68;--fire:#b46c41;--ice:#689ea8;--wind:#739179;--earth:#a28b58}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:var(--paper);font-family:"Segoe UI",system-ui,-apple-system,sans-serif;line-height:1.5}a{color:inherit;text-decoration:none}a:focus-visible{outline:3px solid #507d70;outline-offset:5px}img{max-width:100%}figure,h1,h2,h3,p{margin:0}
+.hero{position:relative;isolation:isolate;min-height:430px;display:flex;align-items:center;color:#f5eedf;background:#1b3734;overflow:hidden}.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#0e2927ed,#0d2828bd 46%,#18363226),url('client/public/assets/illustrated/lobby_background.png') 52% 48%/cover}.hero-inner{width:min(1240px,100%);margin:auto;padding:64px 36px}.eyebrow,.kicker{text-transform:uppercase;font-weight:650;letter-spacing:.13em}.eyebrow{font-size:11px;color:#cfbd93;display:flex;align-items:center;gap:12px}.eyebrow::before{content:"";width:24px;height:1px;background:currentColor}h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(46px,7vw,82px);font-weight:400;line-height:1.08;letter-spacing:-.04em;margin:21px 0}.hero-description{max-width:465px;font-size:16px;line-height:1.7;color:#d7e0d2}.hero-stats{display:flex;gap:32px;margin-top:32px}.hero-stat{display:flex;align-items:center;gap:10px}.hero-stat strong{font-size:27px;line-height:1;font-weight:500;color:#e0c697}.hero-stat span{font-size:11px;line-height:1.45;color:#c3d1be;max-width:76px}
+.nav{position:sticky;top:0;z-index:5;background:#f3ede1f5;border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}.nav-inner{max-width:1240px;padding:0 36px;margin:auto;display:flex;gap:26px;align-items:center;overflow-x:auto;scrollbar-width:thin}.nav a{padding:19px 0;font-size:12px;font-weight:650;white-space:nowrap;border-bottom:2px solid transparent}.nav a:hover{color:#49725b;border-bottom-color:#789274}.nav-note{margin-left:auto;font-size:11px;color:var(--muted);white-space:nowrap}
+main{max-width:1240px;margin:auto;padding:58px 36px 64px}.section-intro{display:flex;align-items:flex-end;gap:30px;justify-content:space-between;margin-bottom:30px;scroll-margin-top:90px}.section-intro .kicker{font-size:10px;color:#8a7f5c;margin-bottom:8px}.section-intro h2{font-family:Georgia,"Times New Roman",serif;font-size:39px;line-height:1.12;font-weight:400;letter-spacing:-.035em}.section-intro>p{max-width:390px;color:var(--muted);font-size:13px;line-height:1.65}.section-divider{margin-top:68px;border-top:1px solid var(--line);padding-top:46px}.lineage{--element:var(--fire);margin-bottom:35px}.lineage.ice{--element:var(--ice)}.lineage.wind{--element:var(--wind)}.lineage.earth{--element:var(--earth)}.lineage-heading{display:flex;align-items:center;gap:12px;margin-bottom:15px}.element-index{display:grid;place-items:center;width:29px;height:29px;border:1px solid var(--element);border-radius:50%;font-size:10px;color:var(--element)}.lineage-heading h2{font-size:20px;font-weight:600;letter-spacing:-.02em}.lineage-heading>p{margin-left:auto;font-size:11px;color:var(--muted)}
+.art-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.art-card{min-width:0;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#f9f5ec}.art-stage{height:320px;display:grid;place-items:center;padding:20px 16px 8px;position:relative;background:radial-gradient(ellipse at 50% 50%,#fffef955,#e6e0ce88)}.art-stage::after{content:"";position:absolute;left:25%;right:25%;bottom:20px;height:15px;background:#31433313;border-radius:50%;filter:blur(8px);pointer-events:none}.art-stage img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 9px 8px #172e2321);position:relative;z-index:1}.art-card figcaption{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 20px 8px}.kicker{font-size:9px;color:#79816c;line-height:1.5}h3{font-size:17px;font-weight:600;letter-spacing:-.01em;margin-top:4px;overflow-wrap:anywhere}.file-link{display:inline-flex;align-items:center;gap:8px;flex:0 0 auto;font-size:11px;font-weight:650;border:1px solid #c5cfb8;border-radius:6px;background:#e7eddb;padding:8px 10px;color:#526e4f}.file-link:hover{background:#d6e1c6;border-color:#91a881}.filename{font-size:10px;color:#77826d;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.art-card>.filename{padding:0 20px 18px}.lineage .art-card{border-top:2px solid var(--element)}.enemy-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.enemy-grid .boss-card{grid-column:span 2}.enemy-grid .boss-card .art-stage{background:radial-gradient(ellipse at 50% 50%,#d9dfc155,#c8cfb399)}.object-grid .art-stage{height:290px}
+.scenes{display:grid;gap:24px}.scene-card{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#f9f5ec}.scene-card>a{display:block;background:#d2d7c7}.scene-card img{display:block;width:100%;height:auto}.scene-card figcaption{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:22px 25px}.scene-card h3{font-size:21px;margin-bottom:7px}.scene-card .kicker{font-size:10px}.closing{display:flex;justify-content:space-between;align-items:center;gap:28px;border-top:1px solid var(--line);padding-top:24px;margin-top:54px;font-size:12px;color:var(--muted)}.closing strong{color:var(--ink);font-size:13px}.closing p{max-width:580px;line-height:1.65}.back-top{white-space:nowrap;font-size:12px;font-weight:650;border-bottom:1px solid #9dab8d;padding-bottom:3px}
+@media(max-width:900px){.hero{min-height:380px}.hero-inner{padding:50px 26px}.nav-inner{padding:0 26px;gap:22px}.nav-note{display:none}main{padding:42px 26px}.art-stage{height:255px;padding:13px 10px 6px}.art-card figcaption{padding:16px 14px 7px}.art-card>.filename{padding:0 14px 15px;font-size:9px}.art-grid{gap:12px}.file-link{font-size:10px;padding:7px 8px}.section-intro h2{font-size:33px}.section-intro>p{max-width:330px;font-size:12px}.object-grid .art-stage{height:240px}}
+@media(max-width:640px){.hero{min-height:410px}.hero::before{background:linear-gradient(90deg,#112d2de8,#142e2ac4),url('client/public/assets/illustrated/lobby_background.png') 54% 50%/cover}.hero-inner{padding:40px 22px}.hero-description{font-size:14px}.hero-stats{gap:20px}.hero-stat{gap:7px}.hero-stat strong{font-size:23px}.hero-stat span{font-size:10px}.nav-inner{padding:0 22px;gap:25px}.nav a{font-size:11px;padding:15px 0}main{padding:36px 20px}.section-intro{display:block;margin-bottom:25px}.section-intro>p{max-width:none;margin-top:14px}.section-intro h2{font-size:33px}.lineage-heading{flex-wrap:wrap;gap:9px}.lineage-heading>p{width:100%;margin-left:38px;font-size:11px}.art-grid{grid-template-columns:1fr;gap:14px}.art-stage{height:340px;padding:20px}.art-card figcaption{padding:18px 20px 8px}.art-card>.filename{padding:0 20px 18px;font-size:10px}.art-card .kicker{font-size:10px}.art-card h3{font-size:19px}.file-link{font-size:11px;padding:9px 12px}.lineage{margin-bottom:34px}.enemy-grid .boss-card{grid-column:auto}.object-grid .art-stage{height:310px}.section-divider{margin-top:48px;padding-top:36px}.scene-card figcaption{padding:18px;align-items:flex-start}.scene-card h3{font-size:19px}.scene-card .kicker{font-size:9px}.scene-card .filename{font-size:9px}.closing{display:block;margin-top:38px}.closing .back-top{display:inline-block;margin-top:22px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}@media print{.nav,.back-top{display:none}.hero{min-height:240px}.hero-inner{padding:30px}main{padding:30px}.art-card,.scene-card{break-inside:avoid}.section-intro,.lineage-heading{break-after:avoid}.art-stage{height:240px}.hero,.art-stage,.scene-card{print-color-adjust:exact}}
+</style>
+</head>
+<body id="pradzia">
+<header class="hero"><div class="hero-inner"><p class="eyebrow">ENERGY FIGHT · ILIUSTRACIJŲ RINKINYS</p><h1>Piešinių galerija</h1><p class="hero-description">Visi šio rinkinio veikėjų, priešų, objektų ir aplinkų piešiniai vienoje vietoje. Atidaryk bet kurį PNG, kad pamatytum originalų failą.</p><div class="hero-stats"><div class="hero-stat"><strong>23</strong><span>originalūs PNG piešiniai</span></div><div class="hero-stat"><strong>4</strong><span>elementų linijos</span></div><div class="hero-stat"><strong>8</strong><span>evoliucijos atšakos</span></div></div></div></header>
+<nav class="nav" aria-label="Galerijos skyriai"><div class="nav-inner"><a href="#veikejai">Veikėjai</a><a href="#priesai">Priešai</a><a href="#objektai">Objektai</a><a href="#aplinkos">Aplinkos</a><span class="nav-note">Atskiri grafikos ištekliai · PNG</span></div></nav>
+<main>
+<section class="section-intro" id="veikejai"><div><p class="kicker">01 / VEIKĖJAI</p><h2>Keturios augimo kryptys</h2></div><p>Kiekvienai elementų linijai parengta maža pradinė būtybė ir dvi ryškesnės evoliucijos formos.</p></section>
+<section class="lineage fire" aria-labelledby="heading-fire">
+      <header class="lineage-heading"><span class="element-index">01</span><h2 id="heading-fire">Ugnis</h2><p>Pradinė forma ir dvi evoliucijos atšakos</p></header>
+      <div class="art-grid"><figure class="art-card base-form">
+      <a class="image-link" href="client/public/assets/illustrated/char_pyra_base.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: Pradinė forma">
+        <div class="art-stage"><img src="client/public/assets/illustrated/char_pyra_base.png" alt="Pradinė forma – maža pradinė būtybė" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Maža pradinė būtybė</p><h3>Pradinė forma</h3></div><a class="file-link" href="client/public/assets/illustrated/char_pyra_base.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">char_pyra_base.png</p>
+    </figure><figure class="art-card evolved-form">
+      <a class="image-link" href="client/public/assets/illustrated/char_pyra_flare.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: FLARE">
+        <div class="art-stage"><img src="client/public/assets/illustrated/char_pyra_flare.png" alt="FLARE – evoliucijos atšaka" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Evoliucijos atšaka</p><h3>FLARE</h3></div><a class="file-link" href="client/public/assets/illustrated/char_pyra_flare.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">char_pyra_flare.png</p>
+    </figure><figure class="art-card evolved-form">
+      <a class="image-link" href="client/public/assets/illustrated/char_pyra_furnace.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: FURNACE">
+        <div class="art-stage"><img src="client/public/assets/illustrated/char_pyra_furnace.png" alt="FURNACE – evoliucijos atšaka" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Evoliucijos atšaka</p><h3>FURNACE</h3></div><a class="file-link" href="client/public/assets/illustrated/char_pyra_furnace.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">char_pyra_furnace.png</p>
+    </figure></div>
+    </section><section class="lineage ice" aria-labelledby="heading-ice">
+      <header class="lineage-heading"><span class="element-index">02</span><h2 id="heading-ice">Ledas</h2><p>Pradinė forma ir dvi evoliucijos atšakos</p></header>
+      <div class="art-grid"><figure class="art-card base-form">
+      <a class="image-link" href="client/public/assets/illustrated/char_krios_base.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: Pradinė forma">
+        <div class="art-stage"><img src="client/public/assets/illustrated/char_krios_base.png" alt="Pradinė forma – maža pradinė būtybė" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Maža pradinė būtybė</p><h3>Pradinė forma</h3></div><a class="file-link" href="client/public/assets/illustrated/char_krios_base.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">char_krios_base.png</p>
+    </figure><figure class="art-card evolved-form">
+      <a class="image-link" href="client/public/assets/illustrated/char_krios_prism.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: PRISM">
+        <div class="art-stage"><img src="client/public/assets/illustrated/char_krios_prism.png" alt="PRISM – evoliucijos atšaka" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Evoliucijos atšaka</p><h3>PRISM</h3></div><a class="file-link" href="client/public/assets/illustrated/char_krios_prism.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">char_krios_prism.png</p>
+    </figure><figure class="art-card evolved-form">
+      <a class="image-link" href="client/public/assets/illustrated/char_krios_glacier.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: GLACIER">
+        <div class="art-stage"><img src="client/public/assets/illustrated/char_krios_glacier.png" alt="GLACIER – evoliucijos atšaka" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Evoliucijos atšaka</p><h3>GLACIER</h3></div><a class="file-link" href="client/public/assets/illustrated/char_krios_glacier.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">char_krios_glacier.png</p>
+    </figure></div>
+    </section><section class="lineage wind" aria-labelledby="heading-wind">
+      <header class="lineage-heading"><span class="element-index">03</span><h2 id="heading-wind">Vėjas</h2><p>Pradinė forma ir dvi evoliucijos atšakos</p></header>
+      <div class="art-grid"><figure class="art-card base-form">
+      <a class="image-link" href="client/public/assets/illustrated/char_vektor_base.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: Pradinė forma">
+        <div class="art-stage"><img src="client/public/assets/illustrated/char_vektor_base.png" alt="Pradinė forma – maža pradinė būtybė" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Maža pradinė būtybė</p><h3>Pradinė forma</h3></div><a class="file-link" href="client/public/assets/illustrated/char_vektor_base.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">char_vektor_base.png</p>
+    </figure><figure class="art-card evolved-form">
+      <a class="image-link" href="client/public/assets/illustrated/char_vektor_tempest.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: TEMPEST">
+        <div class="art-stage"><img src="client/public/assets/illustrated/char_vektor_tempest.png" alt="TEMPEST – evoliucijos atšaka" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Evoliucijos atšaka</p><h3>TEMPEST</h3></div><a class="file-link" href="client/public/assets/illustrated/char_vektor_tempest.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">char_vektor_tempest.png</p>
+    </figure><figure class="art-card evolved-form">
+      <a class="image-link" href="client/public/assets/illustrated/char_vektor_raptor.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: RAPTOR">
+        <div class="art-stage"><img src="client/public/assets/illustrated/char_vektor_raptor.png" alt="RAPTOR – evoliucijos atšaka" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Evoliucijos atšaka</p><h3>RAPTOR</h3></div><a class="file-link" href="client/public/assets/illustrated/char_vektor_raptor.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">char_vektor_raptor.png</p>
+    </figure></div>
+    </section><section class="lineage earth" aria-labelledby="heading-earth">
+      <header class="lineage-heading"><span class="element-index">04</span><h2 id="heading-earth">Žemė</h2><p>Pradinė forma ir dvi evoliucijos atšakos</p></header>
+      <div class="art-grid"><figure class="art-card base-form">
+      <a class="image-link" href="client/public/assets/illustrated/char_litos_base.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: Pradinė forma">
+        <div class="art-stage"><img src="client/public/assets/illustrated/char_litos_base.png" alt="Pradinė forma – maža pradinė būtybė" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Maža pradinė būtybė</p><h3>Pradinė forma</h3></div><a class="file-link" href="client/public/assets/illustrated/char_litos_base.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">char_litos_base.png</p>
+    </figure><figure class="art-card evolved-form">
+      <a class="image-link" href="client/public/assets/illustrated/char_litos_monolith.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: MONOLITH">
+        <div class="art-stage"><img src="client/public/assets/illustrated/char_litos_monolith.png" alt="MONOLITH – evoliucijos atšaka" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Evoliucijos atšaka</p><h3>MONOLITH</h3></div><a class="file-link" href="client/public/assets/illustrated/char_litos_monolith.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">char_litos_monolith.png</p>
+    </figure><figure class="art-card evolved-form">
+      <a class="image-link" href="client/public/assets/illustrated/char_litos_seismic.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: SEISMIC">
+        <div class="art-stage"><img src="client/public/assets/illustrated/char_litos_seismic.png" alt="SEISMIC – evoliucijos atšaka" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Evoliucijos atšaka</p><h3>SEISMIC</h3></div><a class="file-link" href="client/public/assets/illustrated/char_litos_seismic.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">char_litos_seismic.png</p>
+    </figure></div>
+    </section>
+<section class="section-intro section-divider" id="priesai"><div><p class="kicker">02 / PRIEŠAI</p><h2>Kas laukia arenoje</h2></div><p>Keturi įprastų priešų vaidmenys ir pagrindinis misijos bosas.</p></section><div class="art-grid enemy-grid">
+<figure class="art-card ">
+      <a class="image-link" href="client/public/assets/illustrated/enemy_pursuer.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: Persekiotojas">
+        <div class="art-stage"><img src="client/public/assets/illustrated/enemy_pursuer.png" alt="Persekiotojas – artima kova" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Artima kova</p><h3>Persekiotojas</h3></div><a class="file-link" href="client/public/assets/illustrated/enemy_pursuer.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">enemy_pursuer.png</p>
+    </figure><figure class="art-card ">
+      <a class="image-link" href="client/public/assets/illustrated/enemy_ranged.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: Šaulys">
+        <div class="art-stage"><img src="client/public/assets/illustrated/enemy_ranged.png" alt="Šaulys – nuotolinės atakos" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Nuotolinės atakos</p><h3>Šaulys</h3></div><a class="file-link" href="client/public/assets/illustrated/enemy_ranged.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">enemy_ranged.png</p>
+    </figure><figure class="art-card ">
+      <a class="image-link" href="client/public/assets/illustrated/enemy_armored.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: Šarvuotasis">
+        <div class="art-stage"><img src="client/public/assets/illustrated/enemy_armored.png" alt="Šarvuotasis – sunkusis priešas" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Sunkusis priešas</p><h3>Šarvuotasis</h3></div><a class="file-link" href="client/public/assets/illustrated/enemy_armored.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">enemy_armored.png</p>
+    </figure><figure class="art-card ">
+      <a class="image-link" href="client/public/assets/illustrated/enemy_support.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: Palaikytojas">
+        <div class="art-stage"><img src="client/public/assets/illustrated/enemy_support.png" alt="Palaikytojas – pastiprinimo iškvietimas" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Pastiprinimo iškvietimas</p><h3>Palaikytojas</h3></div><a class="file-link" href="client/public/assets/illustrated/enemy_support.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">enemy_support.png</p>
+    </figure><figure class="art-card boss-card">
+      <a class="image-link" href="client/public/assets/illustrated/enemy_boss.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: Motininė masė">
+        <div class="art-stage"><img src="client/public/assets/illustrated/enemy_boss.png" alt="Motininė masė – misijos bosas" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Misijos bosas</p><h3>Motininė masė</h3></div><a class="file-link" href="client/public/assets/illustrated/enemy_boss.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">enemy_boss.png</p>
+    </figure>
+</div><section class="section-intro section-divider" id="objektai"><div><p class="kicker">03 / OBJEKTAI</p><h2>Pasaulio detalės</h2></div><p>Misijos įrenginiai ir surenkamas objektas, paruošti naudoti atskirais vaizdais.</p></section><div class="art-grid object-grid">
+<figure class="art-card ">
+      <a class="image-link" href="client/public/assets/illustrated/prop_stabilizer.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: Stabilizatorius">
+        <div class="art-stage"><img src="client/public/assets/illustrated/prop_stabilizer.png" alt="Stabilizatorius – misijos objektas" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Misijos objektas</p><h3>Stabilizatorius</h3></div><a class="file-link" href="client/public/assets/illustrated/prop_stabilizer.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">prop_stabilizer.png</p>
+    </figure><figure class="art-card ">
+      <a class="image-link" href="client/public/assets/illustrated/prop_gateway.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: Vartai">
+        <div class="art-stage"><img src="client/public/assets/illustrated/prop_gateway.png" alt="Vartai – aplinkos objektas" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Aplinkos objektas</p><h3>Vartai</h3></div><a class="file-link" href="client/public/assets/illustrated/prop_gateway.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">prop_gateway.png</p>
+    </figure><figure class="art-card ">
+      <a class="image-link" href="client/public/assets/illustrated/pickup_biocell.png" target="_blank" rel="noopener" aria-label="Atidaryti piešinį: Bioląstelė">
+        <div class="art-stage"><img src="client/public/assets/illustrated/pickup_biocell.png" alt="Bioląstelė – surenkamas objektas" width="512" height="512" loading="lazy" decoding="async"></div>
+      </a>
+      <figcaption><div><p class="kicker">Surenkamas objektas</p><h3>Bioląstelė</h3></div><a class="file-link" href="client/public/assets/illustrated/pickup_biocell.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption>
+      <p class="filename">pickup_biocell.png</p>
+    </figure>
+</div><section class="section-intro section-divider" id="aplinkos"><div><p class="kicker">04 / APLINKOS</p><h2>Vietos mūsų istorijai</h2></div><p>Stoties panorama, kovos arena ir grindų tekstūra. Vaizdai čia pateikiami visu pločiu.</p></section><div class="scenes">
+<figure class="scene-card"><a href="client/public/assets/illustrated/lobby_background.png" target="_blank" rel="noopener" aria-label="Atidaryti visą piešinį: Stoties panorama"><img src="client/public/assets/illustrated/lobby_background.png" alt="Stoties panorama" loading="lazy" decoding="async"></a><figcaption><div><p class="kicker">Laboratorijos ir laukiamojo aplinka</p><h3>Stoties panorama</h3><p class="filename">lobby_background.png</p></div><a class="file-link" href="client/public/assets/illustrated/lobby_background.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption></figure><figure class="scene-card"><a href="client/public/assets/illustrated/arena_background.png" target="_blank" rel="noopener" aria-label="Atidaryti visą piešinį: Kovos arena"><img src="client/public/assets/illustrated/arena_background.png" alt="Kovos arena" loading="lazy" decoding="async"></a><figcaption><div><p class="kicker">Misijos aplinka</p><h3>Kovos arena</h3><p class="filename">arena_background.png</p></div><a class="file-link" href="client/public/assets/illustrated/arena_background.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption></figure><figure class="scene-card"><a href="client/public/assets/illustrated/floor_texture.png" target="_blank" rel="noopener" aria-label="Atidaryti visą piešinį: Grindų paviršius"><img src="client/public/assets/illustrated/floor_texture.png" alt="Grindų paviršius" loading="lazy" decoding="async"></a><figcaption><div><p class="kicker">Arenos tekstūra</p><h3>Grindų paviršius</h3><p class="filename">floor_texture.png</p></div><a class="file-link" href="client/public/assets/illustrated/floor_texture.png" target="_blank" rel="noopener">PNG <span aria-hidden="true">↗</span></a></figcaption></figure>
+</div><footer class="closing"><p><strong>Piešinių galerija.</strong> Šis dokumentas skirtas atskirų grafikos failų peržiūrai. Išskleisk visą ZIP, išlaikyk aplankų struktūrą ir atidaryk šį HTML failą naršyklėje. Žaidimo paleidimo instrukcija pateikta README faile.</p><a class="back-top" href="#pradzia">Į pradžią ↑</a></footer>
+</main>
+</body>
+</html>

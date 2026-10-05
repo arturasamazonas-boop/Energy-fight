@@ -1,8 +1,10 @@
 // Touch (multi-pointer) and keyboard controls. Movement stick and action
 // buttons use independent pointers so moving and attacking work together.
-import type { ActionKind } from "@ef/shared";
+import { LINEAGE_SPECS, type ActionKind, type LineageId } from "@ef/shared";
 import { t } from "../i18n.ts";
 import { unlockAudio } from "./audio.ts";
+import { actionGlyph } from "./art.ts";
+import "./interface.css";
 
 export interface ControlState {
   mx: number;
@@ -24,24 +26,27 @@ export class Controls {
   private keys = new Set<string>();
   private buttons: Record<string, HTMLElement> = {};
   private cleanup: (() => void)[] = [];
+  private lineage: LineageId | null = null;
+  private pressTimers = new Set<ReturnType<typeof setTimeout>>();
 
   constructor(parent: HTMLElement) {
     this.root = document.createElement("div");
-    this.root.className = "controls";
+    this.root.className = "controls illustrated-controls";
     this.root.innerHTML = `
       <div class="stick-zone"></div>
+      <div class="stick-home" aria-hidden="true"><div class="stick-knob"></div></div>
       <div class="stick-base hidden"><div class="stick-knob"></div></div>
       <div class="btn-cluster">
-        <button class="cbtn od" data-a="overdrive" aria-label="Perkrova"><span>OD</span><i></i></button>
-        <button class="cbtn s2" data-a="skill2" aria-label="2 įgūdis"><span>2</span><i></i></button>
-        <button class="cbtn s1" data-a="skill1" aria-label="1 įgūdis"><span>1</span><i></i></button>
-        <button class="cbtn dodge" data-a="dodge" aria-label="Išsisukti"><span>⤳</span><i></i></button>
-        <button class="cbtn atk" data-a="attack" aria-label="Smūgis"><span>✦</span></button>
+        <button class="cbtn od" data-a="overdrive" aria-label="Perkrova"><span>${actionGlyph("overdrive")}</span><kbd class="action-key">R</kbd><i></i></button>
+        <button class="cbtn s2" data-a="skill2" aria-label="2 įgūdis"><span>${actionGlyph("skill2")}</span><kbd class="action-key">E</kbd><b class="action-index">2</b><i></i></button>
+        <button class="cbtn s1" data-a="skill1" aria-label="1 įgūdis"><span>${actionGlyph("skill1")}</span><kbd class="action-key">Q</kbd><b class="action-index">1</b><i></i></button>
+        <button class="cbtn dodge" data-a="dodge" aria-label="Išsisukti"><span>${actionGlyph("dodge")}</span><kbd class="action-key">⇧</kbd><i></i></button>
+        <button class="cbtn atk" data-a="attack" aria-label="Smūgis"><span>${actionGlyph("attack")}</span><kbd class="action-key">J</kbd></button>
       </div>
       <div class="keys-help">${t("keys_help")}</div>`;
     parent.appendChild(this.root);
     this.stickBase = this.root.querySelector(".stick-base")!;
-    this.stickKnob = this.root.querySelector(".stick-knob")!;
+    this.stickKnob = this.stickBase.querySelector(".stick-knob")!;
     this.root.querySelectorAll<HTMLElement>(".cbtn").forEach((b) => (this.buttons[b.dataset.a!] = b));
     const help = this.root.querySelector(".keys-help") as HTMLElement;
     const helpTimer = window.setTimeout(() => help.classList.add("faded"), 9000);
@@ -58,6 +63,7 @@ export class Controls {
       this.stickBase.style.left = `${e.clientX}px`;
       this.stickBase.style.top = `${e.clientY}px`;
       this.stickBase.classList.remove("hidden");
+      this.root.classList.add("stick-active");
       this.updateStick(e.clientX, e.clientY);
     });
     this.listen(zone, "pointermove", (e: PointerEvent) => {
@@ -95,7 +101,8 @@ export class Controls {
         e.preventDefault();
         this.onAction(a);
         this.buttons[a].classList.add("pressed");
-        setTimeout(() => this.buttons[a].classList.remove("pressed"), 120);
+        const timer = setTimeout(() => { this.buttons[a].classList.remove("pressed"); this.pressTimers.delete(timer); }, 120);
+        this.pressTimers.add(timer);
       });
     }
     this.listen(this.root, "contextmenu", (e: Event) => e.preventDefault());
@@ -134,6 +141,7 @@ export class Controls {
   private releaseStick() {
     this.stickPointer = null;
     this.stickBase.classList.add("hidden");
+    this.root.classList.remove("stick-active");
     this.stickKnob.style.transform = "";
     this.state.mx = 0;
     this.state.my = 0;
@@ -195,17 +203,29 @@ export class Controls {
     const i = b.querySelector("i") as HTMLElement | null;
     if (i) i.style.setProperty("--cd", String(Math.max(0, Math.min(1, opts.ratio))));
     b.classList.toggle("disabled", !opts.enabled);
+    b.setAttribute("aria-disabled", String(!opts.enabled));
     b.classList.toggle("ready", !!opts.ready);
     b.classList.toggle("gone", opts.visible === false);
   }
 
-  setTheme(color: string) {
+  setTheme(color: string, lineage?: LineageId) {
     this.root.style.setProperty("--lin", color);
+    if (lineage && lineage !== this.lineage) {
+      this.lineage = lineage;
+      this.buttons.skill1.querySelector("span")!.innerHTML = actionGlyph("skill1", lineage);
+      this.buttons.skill2.querySelector("span")!.innerHTML = actionGlyph("skill2", lineage);
+      this.buttons.skill1.setAttribute("aria-label", t(LINEAGE_SPECS[lineage].skill1.id));
+      this.buttons.skill2.setAttribute("aria-label", t(LINEAGE_SPECS[lineage].skill2.id));
+      this.buttons.skill1.title = t(LINEAGE_SPECS[lineage].skill1.id);
+      this.buttons.skill2.title = t(LINEAGE_SPECS[lineage].skill2.id);
+    }
   }
 
   destroy() {
     this.releaseAll();
     this.cleanup.forEach((f) => f());
+    this.pressTimers.forEach((timer) => clearTimeout(timer));
+    this.pressTimers.clear();
     this.root.remove();
   }
 }

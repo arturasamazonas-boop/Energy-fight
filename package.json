@@ -30,6 +30,7 @@
     "check": "npm run typecheck && tsx scripts/validate-config.ts",
     "test": "node --import tsx --test --test-concurrency=1 tests/*.test.ts",
     "test:e2e": "tsx tests/e2e/browser.e2e.ts",
-    "assets:validate": "tsx scripts/validate-assets.ts"
+    "assets:validate": "tsx scripts/validate-assets.ts",
+    "art:optimize": "tsx scripts/optimize-art.ts"
   }
 }

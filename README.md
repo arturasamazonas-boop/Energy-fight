@@ -2,6 +2,8 @@
 
 A cooperative 2.5D action brawler prototype for **landscape mobile browsers** (Android Chrome, iPhone Safari). 1–8 friends fight through the mission *Breach at Station Nexus* together. Stronger characters can carry weaker friends, and the weaker friends level up faster.
 
+**Illustrated graphics update:** 23 original PNG illustrations now supply the four juvenile lineages, eight evolutions, five enemies, station environments and interactive objects. The laboratory, lobby, battle HUD and results use the new artwork. Open [PIESINIU_GALERIJA.html](PIESINIU_GALERIJA.html) locally to inspect the paintings without starting the server. Lithuanian delivery and validation notes: [GRAFIKOS_PAKEITIMAI.md](GRAFIKOS_PAKEITIMAI.md).
+
 > **Trumpai lietuviškai.** Atidaryk žaidimą telefone gulsčiai, įvesk vardą, laboratorijoje pasirink liniją (PYRA, KRIOS, VEKTOR arba LITOS) ir paspausk „Kurti kambarį“. 5 raidžių kodą duok draugams, kad prisijungtų. Kai visi pasiruošę, lyderis paspaudžia „Pradėti misiją“. Kairė ekrano pusė yra judėjimo vairalazdė, dešinėje yra smūgio mygtukas (laikyk jį), išsisukimas, 1 ir 2 įgūdžiai ir perkrova. Progresas saugomas serveryje (Postgres arba Neon).
 
 Assumptions for this first prototype: it runs in a landscape mobile browser, with touch controls first. Desktop keyboard is a fallback. Native APK/IPA builds are not part of this prototype.
@@ -23,7 +25,7 @@ Workspaces:
 ```
 shared/   game rules: config, progression, participation, map, movement, the simulation (no Phaser)
 server/   Colyseus room, HTTP API, Postgres/PGlite persistence, reward ledger
-client/   Phaser renderer, DOM UI (lab, lobby, results), touch controls, procedural art
+client/   Phaser renderer, DOM UI (lab, lobby, results), touch controls, illustrated art
 tests/    unit, database, network, eight-client simulation, restart, browser e2e
 ```
 
@@ -32,6 +34,7 @@ tests/    unit, database, network, eight-client simulation, restart, browser e2e
 ```bash
 nvm use            # Node 22
 npm install
+node -e "require('fs').mkdirSync('.data', { recursive: true })"
 npm run dev        # server on :2567 (dev tools on) + Vite client on :5173
 ```
 

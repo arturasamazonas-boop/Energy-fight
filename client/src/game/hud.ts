@@ -1,125 +1,160 @@
-// DOM heads-up display layered over the Phaser canvas.
+// Painted HUD: display-only, updated at a bounded cadence by BattleScene.
 import { t } from "../i18n.ts";
-import { LINEAGE_COLORS } from "./art.ts";
+import { actionGlyph, lineagePortrait, LINEAGE_COLORS } from "./art.ts";
 import type { LineageId } from "@ef/shared";
+import "./interface.css";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+interface TeammateView { root: HTMLElement; name: HTMLElement; status: HTMLElement; bar: HTMLElement; lineage: string }
 
 export class Hud {
   readonly root: HTMLElement;
   private els: Record<string, HTMLElement> = {};
+  private bars = new Map<string, HTMLElement>();
+  private teammates = new Map<string, TeammateView>();
   private bannerTimer: number | undefined;
+  private selfSignature = "";
+  private portraitSignature = "";
   onMenu: () => void = () => {};
 
   constructor(parent: HTMLElement) {
     this.root = document.createElement("div");
-    this.root.className = "hud";
+    this.root.className = "hud illustrated-hud";
     this.root.innerHTML = `
       <div class="hud-self">
-        <div class="hud-name"></div>
-        <div class="bar hp"><b></b><s></s><em></em></div>
-        <div class="bar od"><b></b></div>
+        <div class="hud-portrait"></div>
+        <div class="hud-self-content"><div class="hud-name"></div>
+          <div class="bar hp"><b></b><s></s><em></em></div>
+          <div class="bar od"><b></b></div>
+        </div>
       </div>
       <div class="hud-obj">
+        <div class="hud-eyebrow"><span>NEXUS</span><span class="hud-section">01 / 03</span></div>
         <div class="obj-text"></div>
         <div class="bar obj"><b></b></div>
         <div class="boss hidden"><div class="boss-name">${t("boss_name")}</div><div class="bar bosshp"><b></b></div><div class="bar stag"><b></b></div></div>
       </div>
-      <div class="hud-team"></div>
-      <button class="hud-menu" aria-label="Meniu">☰</button>
+      <div class="hud-team"><div class="hud-team-count"></div><div class="team-members"></div></div>
+      <button class="hud-menu" aria-label="Meniu">${actionGlyph("menu")}</button>
       <div class="hud-banner hidden"></div>
       <div class="hud-down hidden"><div class="down-title"></div><div class="bar revive"><b></b></div><div class="down-sub"></div></div>
       <div class="hud-conn hidden"></div>
+      <div class="hud-loading"><div class="loading-sigil"></div><span>${t("loading")}</span><div class="bar loading"><b></b></div></div>
       <div class="vignette"></div>`;
     parent.appendChild(this.root);
-    for (const k of ["hud-name", "hud-team", "obj-text", "boss", "hud-banner", "hud-down", "down-title", "down-sub", "hud-conn", "vignette"]) {
-      this.els[k] = this.root.querySelector("." + k)!;
+    for (const key of ["hud-name", "hud-portrait", "hud-team", "hud-team-count", "team-members", "hud-section", "obj-text", "boss", "hud-banner", "hud-down", "down-title", "down-sub", "hud-conn", "hud-loading", "vignette"]) {
+      this.els[key] = this.root.querySelector("." + key)!;
     }
+    for (const key of ["hp", "od", "obj", "bosshp", "stag", "revive", "loading"]) this.bars.set(key, this.root.querySelector(`.bar.${key} b`)!);
     this.root.querySelector(".hud-menu")!.addEventListener("click", () => this.onMenu());
   }
 
-  private bar(sel: string, ratio: number) {
-    const b = this.root.querySelector(`.bar.${sel} b`) as HTMLElement | null;
-    if (b) b.style.width = `${Math.max(0, Math.min(1, ratio)) * 100}%`;
+  private bar(key: string, ratio: number) {
+    const bar = this.bars.get(key);
+    if (!bar) return;
+    const width = `${Math.round(Math.max(0, Math.min(1, ratio)) * 1000) / 10}%`;
+    if (bar.style.width !== width) bar.style.width = width;
   }
 
-  updateSelf(p: { name: string; lineage: string; level: number; hp: number; maxHp: number; shield: number; od: number; odT: number; hasOverdrive: boolean; mastery: boolean }) {
+  setLoading(progress: number) {
+    this.bar("loading", progress);
+    this.els["hud-loading"].classList.toggle("hidden", progress >= 1);
+  }
+
+  updateSelf(p: { name: string; lineage: string; evolution?: string; level: number; hp: number; maxHp: number; shield: number; od: number; odT: number; hasOverdrive: boolean; mastery: boolean }) {
     const color = LINEAGE_COLORS[p.lineage as LineageId]?.glow ?? "#fff";
-    this.els["hud-name"].innerHTML = `<i style="background:${color}"></i>${esc(p.name)} <small>${t(p.lineage)} · ${t("level_short")} ${p.level}${p.mastery ? " ★" : ""}</small>`;
+    const signature = `${p.name}|${p.lineage}|${p.level}|${p.mastery}`;
+    if (signature !== this.selfSignature) {
+      this.selfSignature = signature;
+      this.root.style.setProperty("--lin", color);
+      this.els["hud-name"].innerHTML = `<span class="hud-player-name">${esc(p.name)}</span><span class="hud-level">${t("level_short")} ${p.level}${p.mastery ? " ✦" : ""}</span><small>${t(p.lineage)}</small>`;
+    }
+    const portraitSignature = `${p.lineage}.${p.evolution ?? ""}.${p.mastery}`;
+    if (portraitSignature !== this.portraitSignature) {
+      this.portraitSignature = portraitSignature;
+      this.els["hud-portrait"].replaceChildren(lineagePortrait(p.lineage as LineageId, p.evolution ?? "", p.mastery, 62));
+    }
     this.bar("hp", p.hp / Math.max(1, p.maxHp));
-    const s = this.root.querySelector(".bar.hp s") as HTMLElement;
-    s.style.width = `${Math.min(1, p.shield / Math.max(1, p.maxHp)) * 100}%`;
-    (this.root.querySelector(".bar.hp em") as HTMLElement).textContent = `${Math.max(0, Math.round(p.hp))}/${p.maxHp}`;
-    const od = this.root.querySelector(".bar.od") as HTMLElement;
-    od.classList.toggle("hidden", !p.hasOverdrive);
-    od.classList.toggle("full", p.od >= 100 || p.odT > 0);
+    const shield = this.root.querySelector(".bar.hp s") as HTMLElement;
+    shield.style.width = `${Math.min(1, p.shield / Math.max(1, p.maxHp)) * 100}%`;
+    const healthText = `${Math.max(0, Math.round(p.hp))} / ${p.maxHp}`;
+    const health = this.root.querySelector(".bar.hp em") as HTMLElement;
+    if (health.textContent !== healthText) health.textContent = healthText;
+    const overdrive = this.root.querySelector(".bar.od") as HTMLElement;
+    overdrive.classList.toggle("hidden", !p.hasOverdrive);
+    overdrive.classList.toggle("full", p.od >= 100 || p.odT > 0);
     this.bar("od", p.odT > 0 ? p.odT / 8 : p.od / 100);
   }
 
   updateObjective(stage: string, objective: number, boss: { hp: number; maxHp: number; stagger: number } | null) {
-    this.els["obj-text"].textContent = t(`obj_${stage}`);
+    const title = t(`obj_${stage}`);
+    if (this.els["obj-text"].textContent !== title) this.els["obj-text"].textContent = title;
+    this.els["hud-section"].textContent = `0${stage.match(/^s(\d)/)?.[1] ?? "3"} / 03`;
     this.bar("obj", objective / 100);
     this.els["boss"].classList.toggle("hidden", !boss);
-    if (boss) {
-      this.bar("bosshp", boss.hp / Math.max(1, boss.maxHp));
-      this.bar("stag", boss.stagger);
-    }
+    if (boss) { this.bar("bosshp", boss.hp / Math.max(1, boss.maxHp)); this.bar("stag", boss.stagger); }
   }
 
   updateTeam(list: { id: string; name: string; lineage: string; hp: number; maxHp: number; life: string; connected: boolean }[]) {
-    this.els["hud-team"].innerHTML = list
-      .map((p) => {
-        const color = LINEAGE_COLORS[p.lineage as LineageId]?.glow ?? "#fff";
-        const icon = !p.connected ? "⚡" : p.life === "downed" ? "✚" : p.life === "waiting" ? "…" : p.life === "departed" ? "✕" : "";
-        return `<div class="tm ${p.life}${p.connected ? "" : " dc"}"><i style="background:${color}"></i><span>${esc(p.name)}</span><em>${icon}</em><div class="bar"><b style="width:${(Math.max(0, p.hp) / Math.max(1, p.maxHp)) * 100}%"></b></div></div>`;
-      })
-      .join("");
+    const current = new Set<string>();
+    this.els["hud-team"].classList.toggle("hidden", list.length === 0);
+    this.els["hud-team-count"].textContent = t("players", { n: list.length + 1 });
+    for (const p of list) {
+      current.add(p.id);
+      let view = this.teammates.get(p.id);
+      if (!view) {
+        const root = document.createElement("div");
+        root.innerHTML = '<div class="tm-icon"></div><span class="tm-name"></span><em class="tm-status"></em><div class="bar"><b></b></div>';
+        this.els["team-members"].appendChild(root);
+        view = { root, name: root.querySelector(".tm-name")!, status: root.querySelector(".tm-status")!, bar: root.querySelector(".bar b")!, lineage: "" };
+        this.teammates.set(p.id, view);
+      }
+      if (view.lineage !== p.lineage) {
+        view.lineage = p.lineage;
+        view.root.style.setProperty("--team-color", LINEAGE_COLORS[p.lineage as LineageId]?.glow ?? "#fff");
+        view.root.querySelector(".tm-icon")!.replaceChildren(lineagePortrait(p.lineage as LineageId, "", false, 27));
+      }
+      const className = `tm ${p.life}${p.connected ? "" : " dc"}`;
+      if (view.root.className !== className) view.root.className = className;
+      if (view.name.textContent !== p.name) view.name.textContent = p.name;
+      const status = !p.connected ? "·" : p.life === "downed" ? "+" : p.life === "waiting" ? "…" : p.life === "departed" ? "×" : "";
+      if (view.status.textContent !== status) view.status.textContent = status;
+      const width = `${Math.round(Math.max(0, Math.min(1, p.hp / Math.max(1, p.maxHp))) * 100)}%`;
+      if (view.bar.style.width !== width) view.bar.style.width = width;
+    }
+    for (const [id, view] of this.teammates) {
+      if (!current.has(id)) { view.root.remove(); this.teammates.delete(id); }
+    }
   }
 
   banner(text: string, ms = 2200) {
-    const el = this.els["hud-banner"];
-    el.textContent = text;
-    el.classList.remove("hidden");
-    el.classList.remove("pop");
-    void el.offsetWidth;
-    el.classList.add("pop");
+    const element = this.els["hud-banner"];
+    element.textContent = text;
+    element.classList.remove("hidden", "pop");
+    void element.offsetWidth;
+    element.classList.add("pop");
     clearTimeout(this.bannerTimer);
-    this.bannerTimer = window.setTimeout(() => el.classList.add("hidden"), ms);
+    this.bannerTimer = window.setTimeout(() => element.classList.add("hidden"), ms);
   }
 
   downed(state: { life: string; downT: number; revive: number } | null) {
-    const el = this.els["hud-down"];
-    if (!state || state.life === "alive" || state.life === "departed") {
-      el.classList.add("hidden");
-      return;
-    }
-    el.classList.remove("hidden");
-    if (state.life === "downed") {
-      this.els["down-title"].textContent = t("downed");
-      this.els["down-sub"].textContent = `${Math.ceil(state.downT)} s`;
-      this.bar("revive", state.revive);
-    } else {
-      this.els["down-title"].textContent = t("waiting_checkpoint");
-      this.els["down-sub"].textContent = "";
-      this.bar("revive", 0);
-    }
+    const element = this.els["hud-down"];
+    if (!state || state.life === "alive" || state.life === "departed") { element.classList.add("hidden"); return; }
+    element.classList.remove("hidden");
+    this.els["down-title"].textContent = t(state.life === "downed" ? "downed" : "waiting_checkpoint");
+    this.els["down-sub"].textContent = state.life === "downed" ? `${Math.ceil(state.downT)} s` : "";
+    this.bar("revive", state.life === "downed" ? state.revive : 0);
   }
 
   connection(text: string | null) {
-    const el = this.els["hud-conn"];
-    el.classList.toggle("hidden", !text);
-    el.textContent = text ?? "";
+    this.els["hud-conn"].classList.toggle("hidden", !text);
+    this.els["hud-conn"].textContent = text ?? "";
   }
 
   hurt() {
-    const v = this.els["vignette"];
-    v.classList.remove("flash");
-    void v.offsetWidth;
-    v.classList.add("flash");
+    const vignette = this.els["vignette"];
+    vignette.classList.remove("flash"); void vignette.offsetWidth; vignette.classList.add("flash");
   }
 
-  destroy() {
-    clearTimeout(this.bannerTimer);
-    this.root.remove();
-  }
+  destroy() { clearTimeout(this.bannerTimer); this.root.remove(); this.teammates.clear(); }
 }

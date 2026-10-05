@@ -1,0 +1,127 @@
+/* Battlefield-only illustration skin. Shared menu/layout CSS stays independent. */
+.illustrated-hud.hud { z-index: 20; color: #f0e6cf; font-family: "Trebuchet MS", system-ui, sans-serif; }
+.illustrated-hud .hud-self,
+.illustrated-hud .hud-obj {
+  border: 1px solid #c0a67a57;
+  background: linear-gradient(115deg, #15252cf2, #132027df), url('/assets/illustrated/floor_texture.png') center / 280px;
+  box-shadow: 0 5px 24px #0712193d, inset 0 1px #e9d6a919, inset 0 -1px #030b1370;
+  border-radius: 4px 12px 4px 12px;
+}
+.illustrated-hud .hud-self { top: calc(12px + var(--safe-t)); left: calc(14px + var(--safe-l)); width: min(246px, 31vw); min-height: 65px; display: flex; align-items: center; padding: 5px 9px 5px 5px; gap: 7px; }
+.illustrated-hud .hud-portrait { position: relative; width: 52px; height: 52px; flex: 0 0 52px; overflow: hidden; border: 1px solid #c4b48d8c; border-radius: 50%; background: radial-gradient(circle at 50% 65%, color-mix(in srgb, var(--lin) 19%, transparent), #111c26 70%); box-shadow: inset 0 0 10px #07121aa3, 0 0 0 3px #2d38353d; }
+.illustrated-hud .hud-portrait canvas { width: 66px !important; height: 66px !important; position: absolute; left: -7px; top: -7px; }
+.illustrated-hud .hud-self-content { min-width: 0; flex: 1; }
+.illustrated-hud .hud-name { display: grid; grid-template-columns: 1fr auto; gap: 1px 5px; margin-bottom: 4px; line-height: 1.1; }
+.illustrated-hud .hud-player-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 700; }
+.illustrated-hud .hud-level { color: #e4d1a8; font-size: 9px; font-variant-numeric: tabular-nums; }
+.illustrated-hud .hud-name small { grid-column: 1 / -1; color: var(--lin); font-size: 8px; letter-spacing: .16em; }
+.illustrated-hud .bar { border-radius: 2px; border-color: #b6ac812f; box-shadow: inset 0 1px 3px #02080d9c; background: #071117c9; }
+.illustrated-hud .bar.hp { height: 10px; }
+.illustrated-hud .bar.hp b { background: linear-gradient(0deg, #4f8570, #a8c58e 60%, #d3dfaa); }
+.illustrated-hud .bar.hp em { top: -1px; right: 4px; font: 8px/10px system-ui, sans-serif; letter-spacing: .02em; color: #fff9e9; text-shadow: 0 1px 2px #071015; }
+.illustrated-hud .bar.hp s { background: #d5f3f77a; }
+.illustrated-hud .bar.od { margin-top: 4px; height: 4px; }
+.illustrated-hud .bar.od b { background: linear-gradient(90deg, color-mix(in srgb, var(--lin) 60%, #40535d), var(--lin)); }
+.illustrated-hud .bar.od.full { box-shadow: 0 0 10px color-mix(in srgb, var(--lin) 40%, transparent); }
+.illustrated-hud .hud-obj { top: calc(12px + var(--safe-t)); width: min(282px, 32vw); padding: 8px 14px 9px; text-align: left; border-radius: 4px; }
+.illustrated-hud .hud-eyebrow { display: flex; justify-content: space-between; font-size: 8px; letter-spacing: .18em; color: #aebbb6; margin-bottom: 4px; }
+.illustrated-hud .hud-section { color: #d5c296; font-variant-numeric: tabular-nums; }
+.illustrated-hud .obj-text { font-size: 12px; font-weight: 600; line-height: 1.25; color: #f0e8d2; }
+.illustrated-hud .bar.obj { margin-top: 6px; height: 3px; }
+.illustrated-hud .bar.obj b { background: linear-gradient(90deg, #719997, #dac59b); }
+.illustrated-hud .boss { margin-top: 8px; padding-top: 6px; border-top: 1px solid #b69c7954; }
+.illustrated-hud .boss-name { color: #e8b3ad; font-family: Georgia, serif; font-size: 11px; letter-spacing: .1em; }
+.illustrated-hud .bar.bosshp { height: 8px; margin-top: 4px; }
+.illustrated-hud .bar.bosshp b { background: linear-gradient(0deg, #8c494c, #ce847a); }
+.illustrated-hud .bar.stag { height: 3px; }
+.illustrated-hud .hud-team { top: calc(14px + var(--safe-t)); right: calc(65px + var(--safe-r)); width: min(154px, 21vw); gap: 4px; }
+.illustrated-hud .hud-team-count { text-align: right; color: #c7c6b7; text-shadow: 0 1px 3px #09141a; text-transform: uppercase; font-size: 8px; letter-spacing: .1em; }
+.illustrated-hud .team-members { display: grid; gap: 3px; }
+.illustrated-hud .tm { height: 31px; padding: 2px 5px 3px 2px; display: grid; grid-template-columns: 25px minmax(0, 1fr) 10px; grid-template-rows: 16px 3px; gap: 1px 4px; border: 1px solid #c0ac7926; border-radius: 3px; background: #112129d4; }
+.illustrated-hud .tm-icon { grid-column: 1; grid-row: 1 / 3; width: 25px; height: 25px; background: radial-gradient(ellipse, color-mix(in srgb, var(--team-color) 16%, transparent), transparent); }
+.illustrated-hud .tm-icon canvas { width: 27px !important; height: 27px !important; margin-top: -1px; }
+.illustrated-hud .tm-name { grid-column: 2; grid-row: 1; align-self: end; font-size: 10px; color: #ece5d1; }
+.illustrated-hud .tm-status { grid-column: 3; grid-row: 1; font: 15px/15px system-ui; color: #eed2a4; }
+.illustrated-hud .tm .bar { grid-column: 2 / 4; grid-row: 2; height: 3px; border: 0; }
+.illustrated-hud .tm .bar b { background: var(--team-color); opacity: .78; }
+.illustrated-hud .tm.downed { border-color: #cc858367; background: #2a1d25c9; }
+.illustrated-hud .tm.downed .bar b { background: #d28077; }
+.illustrated-hud .hud-menu { top: calc(13px + var(--safe-t)); right: calc(14px + var(--safe-r)); width: 38px; min-height: 38px; height: 38px; display: grid; place-items: center; color: #d9c7a6; background: #14222be8; border: 1px solid #c0a77b6b; border-radius: 4px 9px; box-shadow: inset 0 0 0 3px #bba7830b; }
+.illustrated-hud .hud-menu .action-glyph { width: 24px; height: 24px; }
+.illustrated-hud .hud-banner { top: 24%; padding: 9px 30px; max-width: 74vw; white-space: normal; text-align: center; font: 600 22px/1.2 Georgia, serif; color: #f4e6c3; letter-spacing: .055em; background: linear-gradient(90deg, transparent, #11232bcc 15%, #11232bd9 85%, transparent); border-block: 1px solid #dfc59461; text-shadow: 0 2px 5px #07131b; }
+.illustrated-hud .hud-down { background: #14232ef2; color: #efdfc0; border: 1px solid #bea7848c; border-radius: 5px 15px; box-shadow: 0 10px 38px #040a0f66; }
+.illustrated-hud .down-title { font-family: Georgia, serif; margin-bottom: 8px; }
+.illustrated-hud .down-sub { margin-top: 6px; color: #c7d2c1; }
+.illustrated-hud .hud-conn { color: #f5dbb7; border: 1px solid #c19e79; background: #402927e8; border-radius: 4px; font-size: 12px; }
+.illustrated-hud .hud-loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #14202ce8; color: #dfcea8; font: 15px Georgia, serif; }
+.illustrated-hud .hud-loading .bar { width: 150px; height: 3px; }
+.illustrated-hud .hud-loading .bar b { background: #bfc6a1; }
+.illustrated-hud .loading-sigil { width: 32px; height: 32px; border: 1px solid #d5bd87; transform: rotate(45deg); box-shadow: inset 0 0 0 5px #c0b28015, 0 0 24px #d0b06f22; }
+
+.illustrated-controls.controls { z-index: 10; --lin: #c1d0b3; }
+.illustrated-controls .cbtn {
+  display: grid; place-items: center; color: #ecdfc3; border: 1px solid #c9b38bba;
+  background: radial-gradient(ellipse at 35% 10%, #9bb5ab2c, transparent 55%), linear-gradient(150deg, #263f44de, #111e29f5), url('/assets/illustrated/floor_texture.png') center / 280px;
+  box-shadow: 0 4px 14px #050f1870, inset 0 0 0 4px #07111b80, inset 0 1px 2px #f8e1a65c, inset 0 -4px 6px #030c1566;
+  overflow: hidden; transition: filter .15s, box-shadow .15s, transform .1s;
+}
+.illustrated-controls .cbtn::before { content: ""; position: absolute; inset: 5px; border: 1px solid #afad864f; border-radius: 50%; pointer-events: none; }
+.illustrated-controls .cbtn span { z-index: 3; display: grid; place-items: center; width: 100%; height: 100%; pointer-events: none; }
+.illustrated-controls .action-glyph { width: 32px; height: 32px; margin-top: -3px; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--lin) 22%, transparent)); }
+.illustrated-controls .cbtn.atk { width: 86px; height: 86px; color: #ffebc3; border-width: 2px; }
+.illustrated-controls .cbtn.atk .action-glyph { width: 45px; height: 45px; }
+.illustrated-controls .cbtn.atk.held { background: radial-gradient(ellipse at 35% 10%, #ffffff1a, transparent 55%), linear-gradient(150deg, color-mix(in srgb, var(--lin) 22%, #263e44), #14232af2); box-shadow: 0 0 24px color-mix(in srgb, var(--lin) 22%, transparent), inset 0 0 0 4px #07111b80; }
+.illustrated-controls .cbtn.s1,
+.illustrated-controls .cbtn.s2 { color: var(--lin); }
+.illustrated-controls .cbtn.od { color: #e5c27d; opacity: .6; }
+.illustrated-controls .cbtn.od.ready { opacity: 1; border-color: #f0d290; box-shadow: 0 0 20px #dec38a55, inset 0 0 14px #e4c87320; }
+.illustrated-controls .cbtn.disabled { filter: saturate(.35); opacity: .48; }
+.illustrated-controls .cbtn.gone { display: none; }
+.illustrated-controls .cbtn i { z-index: 2; background: conic-gradient(#06111bd1 calc(var(--cd, 0) * 360deg), transparent 0); pointer-events: none; }
+.illustrated-controls .action-key,
+.illustrated-controls .action-index { position: absolute; z-index: 4; left: 50%; bottom: 4px; transform: translateX(-50%); color: #ece0c5c9; font: 8px/1 system-ui, sans-serif; background: none; border: 0; padding: 0; pointer-events: none; }
+.illustrated-controls .action-index { display: none; }
+.illustrated-controls .stick-base,
+.illustrated-controls .stick-home { width: 120px; height: 120px; border: 1px solid #d4bc936f; border-radius: 50%; background: radial-gradient(circle, #0c1c2638 28%, #14262a7a 30%, #14232b2a 58%, #c4b58b24 60%, #08192377 63%, #b1b49d19 68%, transparent 70%); box-shadow: inset 0 0 0 6px #1a2e322e, 0 2px 15px #07141a36; }
+.illustrated-controls .stick-base::after,
+.illustrated-controls .stick-home::after { content: ""; position: absolute; inset: 12px; border: 1px dashed #c0c1a33b; border-radius: 50%; }
+.illustrated-controls .stick-knob { background: radial-gradient(ellipse at 35% 25%, #8eaaa980, #29404bdd 55%, #102433ed); border: 1px solid #d6c59aac; box-shadow: inset 0 0 0 4px #07182355, inset 0 1px 2px #ffffff40, 0 4px 12px #07121b80; }
+.illustrated-controls .stick-knob::before { content: ""; position: absolute; inset: 16px; transform: rotate(45deg); border: 1px solid #d4dfbc7d; }
+.illustrated-controls .stick-home { position: absolute; left: calc(24px + var(--safe-l)); bottom: calc(19px + var(--safe-b)); opacity: .62; pointer-events: none; }
+.illustrated-controls.stick-active .stick-home { opacity: 0; }
+.illustrated-controls .keys-help { padding: 4px 8px; border-radius: 2px; color: #dedfc8a6; background: #11232a70; font-size: 9px; max-width: 42vw; }
+
+@media (max-height: 480px) and (orientation: landscape) {
+  .illustrated-hud .hud-self { top: calc(8px + var(--safe-t)); min-height: 60px; width: min(226px, 29vw); }
+  .illustrated-hud .hud-obj { top: calc(8px + var(--safe-t)); width: min(258px, 31vw); padding: 7px 11px; }
+  .illustrated-hud .hud-team { top: calc(9px + var(--safe-t)); width: min(174px, 22vw); right: calc(60px + var(--safe-r)); }
+  .illustrated-hud .team-members { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; }
+  .illustrated-hud .tm { height: 28px; grid-template-columns: 19px minmax(0, 1fr) 7px; grid-template-rows: 14px 3px; gap: 1px 2px; padding: 2px 3px 2px 1px; }
+  .illustrated-hud .tm-icon { width: 21px; height: 23px; }
+  .illustrated-hud .tm-icon canvas { width: 24px !important; height: 24px !important; margin-left: -2px; }
+  .illustrated-hud .tm-name { font-size: 8px; }
+  .illustrated-hud .hud-menu { top: calc(9px + var(--safe-t)); }
+  .illustrated-hud .hud-banner { font-size: 19px; }
+}
+@media (max-width: 700px) {
+  .illustrated-hud .hud-self { padding: 5px; gap: 4px; }
+  .illustrated-hud .hud-portrait { flex-basis: 42px; width: 42px; height: 42px; }
+  .illustrated-hud .hud-portrait canvas { width: 54px !important; height: 54px !important; left: -6px; top: -6px; }
+  .illustrated-hud .hud-player-name { font-size: 10px; }
+  .illustrated-hud .hud-level { font-size: 8px; }
+  .illustrated-hud .obj-text { font-size: 10px; }
+  .illustrated-hud .hud-team { right: calc(54px + var(--safe-r)); }
+  .illustrated-hud .hud-menu { right: calc(9px + var(--safe-r)); width: 34px; height: 34px; min-height: 34px; }
+}
+@media (pointer: coarse) {
+  .illustrated-controls .action-key { display: none; }
+  .illustrated-controls .action-index { display: block; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .illustrated-controls .cbtn { opacity: .83; }
+  .illustrated-controls .stick-home { opacity: .27; }
+  .illustrated-controls .cbtn:hover { filter: brightness(1.13); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .illustrated-hud .bar b, .illustrated-controls .cbtn { transition: none; }
+}

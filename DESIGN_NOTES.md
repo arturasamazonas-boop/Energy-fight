@@ -66,6 +66,6 @@ A window counts as able-to-act if the body was alive for at least half of it. A 
 
 - Postgres/Neon instead of SQLite (owner decision; free hosting has no persistent disk).
 - Lobby, lab and results are DOM UI. Only combat is drawn by Phaser, and touch controls are DOM pointer handlers (reliable multi-touch and safe areas).
-- The procedural art draws one right-facing pose and mirrors it. Motion comes from bob, lean, lunge and tint.
+- The illustrated art uses one right-facing painted pose per form and mirrors it. Runtime motion supplies breathing, bob, lean, lunge, hit feedback and elemental effects. Source images are normalized around their visible feet before GPU upload; this does not alter collision geometry or source PNG files. See `ART_GUIDE.md` for the 23-image inventory and scaling contract.
 - Checkpoint behaviour: clearing a section heals the living players and revives downed or waiting ones at the next section's entrance.
 - Room codes are 5 characters from an alphabet without O, 0, I or 1.

@@ -11,9 +11,9 @@ import {
   type LineageId,
 } from "@ef/shared";
 import { api, type ProfileView } from "../api.ts";
-import { lineagePortrait, LINEAGE_COLORS } from "../game/art.ts";
 import { t } from "../i18n.ts";
 import { esc, toast, confirmDialog } from "./dom.ts";
+import { brandHtml, icon, portraitHtml, UI_COPY, UI_LINEAGE_COLORS } from "./artwork.ts";
 
 export interface LabHandlers {
   onCreate: (lineage: LineageId) => void;
@@ -27,26 +27,30 @@ export interface LabHandlers {
 export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandlers, message?: string) {
   let selected: LineageId = profile.lastLineage;
   root.innerHTML = `
-    <div class="screen lab">
+    <div class="screen lab illustrated-screen">
       <header class="lab-head">
-        <div><h1>${t("title")}</h1><div class="sub">${t("lab")} · ${esc(profile.name)}</div></div>
+        <div class="brand">${brandHtml()}</div>
         <div class="wallet">
-          <span title="${t("salvage")}">⚙ ${profile.salvage}</span>
-          <span title="${t("support_marks")}">♥ ${profile.supportMarks}</span>
-          <span title="${t("tiers")}">▲ ${profile.tierUnlocked}/3</span>
-          <button class="ghost settings-btn">⚙ ${t("settings")}</button>
+          <div class="wallet-item" title="${t("salvage")}">${icon("salvage")}<span><small>${t("salvage")}</small><b data-wallet="salvage">${profile.salvage}</b></span></div>
+          <div class="wallet-item" title="${t("support_marks")}">${icon("support")}<span><small>${t("support_marks")}</small><b data-wallet="support">${profile.supportMarks}</b></span></div>
+          <div class="wallet-item" title="${t("tiers")}">${icon("tier")}<span><small>${t("tiers")}</small><b data-wallet="tier">${profile.tierUnlocked}/3</b></span></div>
+          <button class="ghost settings-btn icon-button" title="${t("settings")}" aria-label="${t("settings")}">${icon("settings")}</button>
         </div>
       </header>
       ${message ? `<div class="notice">${esc(message)}</div>` : ""}
       <footer class="lab-actions">
-        <button class="primary create-btn">${t("create_room")}</button>
-        <div class="join-row">
-          <input class="code-input" maxlength="5" autocomplete="off" autocapitalize="characters" placeholder="${t("room_code")}" />
-          <button class="join-btn">${t("join_room")}</button>
+        <div class="expedition-copy"><span class="eyebrow">${UI_COPY.expedition}</span><strong>${UI_COPY.expeditionHelp}</strong></div>
+        <div class="expedition-actions">
+          <button class="primary create-btn">${icon("plus")}${t("create_room")}</button>
+          <div class="join-row">
+            <input class="code-input" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="${t("room_code")}" placeholder="${t("room_code")}" />
+            <button class="join-btn">${t("join_room")}${icon("arrow")}</button>
+          </div>
         </div>
       </footer>
+      <div class="lab-section-title"><div><span class="eyebrow">${t("lab")} · ${esc(profile.name)}</span><h1>${UI_COPY.chooseLineage}</h1></div><p>${UI_COPY.lineageHelp}</p></div>
       <div class="lab-body">
-        <div class="lineage-list"></div>
+        <div class="lineage-list" aria-label="${UI_COPY.selectLineage}"></div>
         <div class="lineage-detail"></div>
       </div>
 
@@ -63,11 +67,14 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
       const rec = profile.lineages[id];
       const b = document.createElement("button");
       b.className = `lcard${id === selected ? " sel" : ""}`;
-      b.style.setProperty("--lin", LINEAGE_COLORS[id].glow);
-      b.appendChild(lineagePortrait(id, rec.evolution ?? "", rec.level >= UNLOCKS.mastery, 72));
+      b.style.setProperty("--lin", UI_LINEAGE_COLORS[id]);
+      b.setAttribute("aria-pressed", String(id === selected));
+      b.insertAdjacentHTML("beforeend", portraitHtml(id, rec.evolution ?? "", rec.level, "card-art"));
       const info = document.createElement("div");
-      info.innerHTML = `<b>${t(id)}</b><small>${t("level_short")} ${rec.level}${rec.evolution ? " · " + t(rec.evolution) : ""}</small>`;
+      info.className = "lcard-info";
+      info.innerHTML = `<b>${t(id)}</b><small>${t("level_short")} ${String(rec.level).padStart(2, "0")}</small>`;
       b.appendChild(info);
+      b.insertAdjacentHTML("beforeend", `<span class="lcard-check">${icon("check")}</span>`);
       b.onclick = () => {
         selected = id;
         api.setLineage(id).catch(() => {});
@@ -86,26 +93,41 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
     const need = xpToNext(rec.level);
     const unlockEntries = Object.entries(UNLOCKS) as [string, number][];
     const next = unlockEntries.find(([, lvl]) => lvl > rec.level);
+    detail.style.setProperty("--lin", UI_LINEAGE_COLORS[selected]);
     detail.innerHTML = `
-      <div class="dhead" style="--lin:${LINEAGE_COLORS[selected].glow}">
-        <div class="portrait"></div>
-        <div>
-          <h2>${t(selected)} <small>${t("level")} ${rec.level}</small></h2>
-          <p>${t(selected + "_desc")}</p>
-          <div class="xpbar"><b style="width:${atCap ? 100 : (rec.xp / need) * 100}%"></b><span>${atCap ? t("level_cap_note") : `${rec.xp}/${need} ${t("xp")}`}</span></div>
-          <p class="small">${next ? t("next_unlock", { name: t("unlock_" + next[0]), level: next[1] }) : t("all_unlocked")}</p>
-          <p class="small">♥ ${L.maxHp} · ⚔ ${L.damage.toFixed(1)} · ${t("fragments")}: ${rec.fragments}</p>
+      <article class="character-overview">
+        <div class="portrait-stage">
+          <span class="specimen-index" aria-hidden="true">0${LINEAGES.indexOf(selected) + 1}</span>
+          <span class="specimen-location">${UI_COPY.station}</span>
+          <div class="portrait">${portraitHtml(selected, rec.evolution ?? "", rec.level, "hero-art")}</div>
+          <div class="stage-name"><span>${rec.evolution ? t(rec.evolution) : UI_COPY.beginning}</span><span>${t("level_short")} ${String(rec.level).padStart(2, "0")}</span></div>
         </div>
-      </div>
-      <div class="skills">
-        <div class="skill"><b>1</b> ${t(spec.skill1.id)}</div>
-        <div class="skill ${L.hasSkill2 ? "" : "locked"}"><b>2</b> ${t(spec.skill2.id)} ${L.hasSkill2 ? "" : `🔒 ${UNLOCKS.skill2}`}</div>
-        <div class="skill ${L.hasOverdrive ? "" : "locked"}"><b>OD</b> ${t("unlock_overdrive")} ${L.hasOverdrive ? "" : `🔒 ${UNLOCKS.overdrive}`}</div>
-      </div>
-      <section class="evo"></section>
-      <section class="mod"></section>
-      <section class="modules"></section>`;
-    detail.querySelector(".portrait")!.appendChild(lineagePortrait(selected, rec.evolution ?? "", rec.level >= UNLOCKS.mastery, 112));
+        <div class="character-summary">
+          <div class="character-title"><h2>${t(selected)}</h2><span class="level-badge">${t("level_short")} ${rec.level}</span></div>
+          <p class="lineage-description">${t(selected + "_desc")}</p>
+          <div class="character-stats">
+            <span title="${UI_COPY.health}">${icon("shield")}<b>${L.maxHp}</b><small>${UI_COPY.health}</small></span>
+            <span title="${UI_COPY.damage}">${icon("sword")}<b>${L.damage.toFixed(1)}</b><small>${UI_COPY.damage}</small></span>
+            <span title="${t("fragments")}">${icon("crystal")}<b>${rec.fragments}</b><small>${t("fragments")}</small></span>
+          </div>
+          <div class="progress-caption"><span>${t("level")} ${rec.level}</span><b>${atCap ? UI_COPY.mastery : `${rec.xp} / ${need} ${t("xp")}`}</b></div>
+          <div class="xpbar" role="progressbar" aria-label="${t("xp")}" aria-valuemin="0" aria-valuemax="${atCap ? 100 : need}" aria-valuenow="${atCap ? 100 : rec.xp}"><b style="width:${atCap ? 100 : Math.min(100, (rec.xp / need) * 100)}%"></b></div>
+          <p class="small next-unlock">${next ? t("next_unlock", { name: t("unlock_" + next[0]), level: next[1] }) : t("level_cap_note")}</p>
+          <div class="growth-track">${[[1, UI_COPY.beginning], [10, t("evolution")], [20, UI_COPY.mastery]].map(([level, name]) => `<span class="${rec.level >= Number(level) ? "reached" : ""}"><i>${String(level).padStart(2, "0")}</i><small>${name}</small></span>`).join("")}</div>
+        </div>
+      </article>
+      <div class="character-loadout">
+        <section class="ability-section"><h3>${UI_COPY.abilities}</h3>
+          <div class="skills">
+            <div class="skill"><b>${icon("sword")}</b><span><small>01</small>${t(spec.skill1.id)}</span></div>
+            <div class="skill ${L.hasSkill2 ? "" : "locked"}"><b>${icon(L.hasSkill2 ? "shield" : "lock")}</b><span><small>${L.hasSkill2 ? "02" : `${t("level_short")} ${UNLOCKS.skill2}`}</small>${t(spec.skill2.id)}</span></div>
+            <div class="skill ${L.hasOverdrive ? "" : "locked"}"><b>${icon(L.hasOverdrive ? "spark" : "lock")}</b><span><small>${L.hasOverdrive ? "OD" : `${t("level_short")} ${UNLOCKS.overdrive}`}</small>${t("unlock_overdrive")}</span></div>
+          </div>
+        </section>
+        <section class="evo"></section>
+        <section class="mod"></section>
+        <section class="modules"></section>
+      </div>`;
 
     // Evolution (level 10): before/after silhouettes + precise mechanical change.
     const evo = detail.querySelector(".evo") as HTMLElement;
@@ -122,17 +144,21 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
       const pics = document.createElement("div");
       pics.className = "beforeafter";
       const before = document.createElement("figure");
-      before.appendChild(lineagePortrait(selected, "", false, 64, true));
+      before.insertAdjacentHTML("beforeend", portraitHtml(selected, "", 1, "evo-art"));
       before.insertAdjacentHTML("beforeend", `<figcaption>${t("before")}</figcaption>`);
       const after = document.createElement("figure");
-      after.appendChild(lineagePortrait(selected, e.id, false, 64, true));
+      after.insertAdjacentHTML("beforeend", portraitHtml(selected, e.id, Math.max(10, rec.level), "evo-art"));
       after.insertAdjacentHTML("beforeend", `<figcaption>${t("after")}</figcaption>`);
-      pics.append(before, after);
+      const arrow = document.createElement("span");
+      arrow.className = "evo-arrow";
+      arrow.innerHTML = icon("arrow");
+      pics.append(before, arrow, after);
       card.appendChild(pics);
       card.insertAdjacentHTML("beforeend", `<b>${t(e.id)}</b><p class="small">${t(e.id + "_desc")}</p>`);
       if (!rec.evolution && rec.level >= UNLOCKS.evolution) {
         const btn = document.createElement("button");
-        btn.textContent = t("choose");
+        btn.className = "evo-choose";
+        btn.innerHTML = `${t("choose")}${icon("arrow")}`;
         btn.onclick = async () => {
           if (!(await confirmDialog(t("evolution_confirm", { name: t(e.id) })))) return;
           try {
@@ -143,7 +169,7 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
           }
         };
         card.appendChild(btn);
-      } else if (chosen) card.insertAdjacentHTML("beforeend", `<span class="tag">${t("chosen")}</span>`);
+      } else if (chosen) card.insertAdjacentHTML("beforeend", `<span class="tag">${icon("check")}${t("chosen")}</span>`);
       opts.appendChild(card);
     }
     evo.appendChild(opts);
@@ -181,7 +207,10 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
         eq.className = "ghost";
         eq.textContent = rec.moduleEquipped === m.id ? t("equipped") : t("equip");
         eq.disabled = rec.moduleEquipped === m.id;
-        eq.onclick = async () => update((await api.equipModule(selected, m.id)).profile);
+        eq.onclick = async () => {
+          try { update((await api.equipModule(selected, m.id)).profile); }
+          catch (err: any) { toast(t("err_" + err.code)); }
+        };
         btns.appendChild(eq);
       }
       const up = document.createElement("button");
@@ -190,7 +219,7 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
         up.disabled = true;
       } else {
         const cost = MODULE_UPGRADE_COST[rank];
-        up.textContent = t("upgrade", { cost: `⚙${cost}` });
+        up.textContent = t("upgrade", { cost });
         up.disabled = profile.salvage < cost;
         up.onclick = async () => {
           try {
@@ -210,9 +239,9 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
     profile = p;
     h.onProfile(p);
     const w = root.querySelector(".wallet")!;
-    w.querySelectorAll("span")[0].textContent = `⚙ ${p.salvage}`;
-    w.querySelectorAll("span")[1].textContent = `♥ ${p.supportMarks}`;
-    w.querySelectorAll("span")[2].textContent = `▲ ${p.tierUnlocked}/3`;
+    w.querySelector('[data-wallet="salvage"]')!.textContent = String(p.salvage);
+    w.querySelector('[data-wallet="support"]')!.textContent = String(p.supportMarks);
+    w.querySelector('[data-wallet="tier"]')!.textContent = `${p.tierUnlocked}/3`;
     drawList();
     drawDetail();
   };
