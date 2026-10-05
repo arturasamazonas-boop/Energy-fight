@@ -3,7 +3,7 @@ import path from "node:path";
 import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { ROOM_NAME, isLineage, rollBoxContents, validateConfig } from "@ef/shared";
 import { openDb, type Db } from "./db.ts";
 import { GameRoom } from "./GameRoom.ts";
@@ -156,6 +156,20 @@ export async function startApp(opts: AppOptions): Promise<RunningApp> {
       labGuard(id);
       const item = req.body?.itemId;
       return { profile: await profiles.equipItem(id, lineageOf(req.body?.lineage), String(req.body?.slot ?? ""), item === null ? null : String(item ?? "")) };
+    }),
+  );
+  app.post(
+    "/api/items/upgrade",
+    handle(async (req, _res, id) => {
+      labGuard(id);
+      return profiles.upgradeItem(id, String(req.body?.itemId ?? ""));
+    }),
+  );
+  app.post(
+    "/api/items/reforge",
+    handle(async (req, _res, id) => {
+      labGuard(id);
+      return profiles.reforgeItem(id, String(req.body?.itemId ?? ""), () => randomInt(0, 2 ** 32) / 2 ** 32);
     }),
   );
   app.post(

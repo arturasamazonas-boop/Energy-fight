@@ -73,3 +73,9 @@
 .reveal.calm *, .reveal.calm { animation-duration: 0s !important; animation-iteration-count: 1 !important; }
 @media (max-height: 430px) { .reveal { gap: 4px; } .reveal-crate canvas { width: 130px; height: 130px; } .reveal-item { width: 220px; } }
 @keyframes raySpin { to { transform: rotate(360deg); } }
+
+/* ---- Beginner tips ------------------------------------------------------------ */
+.tip { position: absolute; left: 50%; top: calc(86px + var(--safe-t, 0px)); transform: translateX(-50%); max-width: min(520px, 70vw); padding: 10px 16px; border-radius: 14px; background: #10202ae8; color: #f4ead2; border: 1px solid #e0c48a99; box-shadow: 0 8px 28px #0008; font-size: 14px; line-height: 1.35; text-align: center; pointer-events: none; animation: tipIn .35s ease-out; z-index: 30; }
+.tip.hidden { display: none; }
+@keyframes tipIn { from { opacity: 0; transform: translateX(-50%) translateY(-8px); } }
+.gear-chip { display: inline-block; padding: 0 7px; border-radius: 999px; background: #e7c97a44; color: #6a4b10; font-size: 12px; }

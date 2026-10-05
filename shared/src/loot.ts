@@ -42,6 +42,10 @@ export const LOOT = {
   dismantleSalvage: { common: 3, rare: 6, epic: 12, legendary: 25, mythic: 50, ultra: 120 } as Record<Rarity, number>,
   critMultiplier: 1.6,
   inventoryLimit: 150,
+  maxPlus: 5,
+  plusStep: 0.06, // each +1 raises every stat of the item by 6% of its base roll
+  upgradeBase: { common: 5, rare: 8, epic: 12, legendary: 20, mythic: 30, ultra: 50 } as Record<Rarity, number>,
+  reforgeMultiplier: 2,
 } as const;
 
 /** Box contents: number of items, rarity weights and bonus salvage per crate tier. */
@@ -102,14 +106,48 @@ export interface ItemInstance {
   rarity: Rarity;
   stats: Partial<Record<StatId, number>>;
   special: SpecialId | null;
+  plus?: number; // upgrade level 0..LOOT.maxPlus
+}
+
+/** Stats including the item's upgrade level. */
+export function effectiveStats(it: ItemInstance): Partial<Record<StatId, number>> {
+  const m = 1 + LOOT.plusStep * (it.plus ?? 0);
+  const out: Partial<Record<StatId, number>> = {};
+  for (const [k, v] of Object.entries(it.stats) as [StatId, number][]) out[k] = Math.round(v * m * 1000) / 1000;
+  return out;
+}
+
+export function upgradeCost(it: ItemInstance): number | null {
+  const plus = it.plus ?? 0;
+  if (plus >= LOOT.maxPlus) return null;
+  return LOOT.upgradeBase[it.rarity] * (plus + 1);
+}
+
+export function reforgeCost(it: ItemInstance): number {
+  return LOOT.upgradeBase[it.rarity] * LOOT.reforgeMultiplier;
+}
+
+/** Re-rolls the secondary stats of an item; slot, rarity, primary stat and special stay. */
+export function reforgeItem(it: ItemInstance, rng: Rng): ItemInstance {
+  const primary = SLOT_PRIMARY[it.slot];
+  const power = LOOT.rarityPower[it.rarity];
+  const stats: Partial<Record<StatId, number>> = { [primary]: it.stats[primary] };
+  const pool = STATS.filter((x) => x !== primary);
+  const count = Object.keys(it.stats).length - 1;
+  for (let i = 0; i < count && pool.length; i++) {
+    const st = pool.splice(Math.floor(rng() * pool.length), 1)[0];
+    stats[st] = Math.round(LOOT.statMax[st] * power * (0.6 + 0.4 * rng()) * 1000) / 1000;
+  }
+  return { ...it, stats };
 }
 
 export type Rng = () => number;
 
-export function itemName(item: Pick<ItemInstance, "baseId" | "slot">): string {
-  if (item.baseId.startsWith("ultra_")) return ULTRA_ITEMS[item.slot].name;
+export function itemName(item: Pick<ItemInstance, "baseId" | "slot"> & { plus?: number }): string {
+  const plus = item.plus ? ` +${item.plus}` : "";
+  if (item.baseId.startsWith("ultra_")) return ULTRA_ITEMS[item.slot].name + plus;
   const idx = Number(item.baseId.split("_")[1]) || 0;
-  return ITEM_BASES[item.slot][idx % ITEM_BASES[item.slot].length];
+  return ITEM_BASES[item.slot][idx % ITEM_BASES[item.slot].length] + plus;
 }
 
 function pickWeighted<T extends string>(weights: Partial<Record<T, number>>, rng: Rng): T {
@@ -234,7 +272,7 @@ export function gearTotals(items: ItemInstance[]): GearTotals {
   const bySlot = new Map<Slot, ItemInstance>();
   for (const it of items) if (!bySlot.has(it.slot)) bySlot.set(it.slot, it); // one item per slot
   for (const it of bySlot.values()) {
-    for (const [k, v] of Object.entries(it.stats) as [StatId, number][]) stats[k] += v;
+    for (const [k, v] of Object.entries(effectiveStats(it)) as [StatId, number][]) stats[k] += v;
     if (it.special) specials.add(it.special);
   }
   for (const s of STATS) stats[s] = round3(Math.min(LOOT.statCap[s], stats[s]));
@@ -244,6 +282,13 @@ export function gearTotals(items: ItemInstance[]): GearTotals {
     auraRarity: bySlot.get("aura")?.rarity ?? "",
     weaponRarity: bySlot.get("weapon")?.rarity ?? "",
   };
+}
+
+/** Single number summarising equipment strength (shown in the lobby). */
+export function gearScore(items: ItemInstance[]): number {
+  let score = 0;
+  for (const it of items) score += Math.round((RARITIES.indexOf(it.rarity) + 1) ** 1.6 * 10 * (1 + 0.1 * (it.plus ?? 0)));
+  return score;
 }
 
 export const RARITY_COLORS: Record<Rarity, string> = {

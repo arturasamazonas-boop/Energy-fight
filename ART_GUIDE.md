@@ -132,3 +132,18 @@ Attach the base form and, when available, the other mature branch as references.
 Full-resolution originals are kept in `art-source/illustrated/`. The game serves smaller copies with the same names from `client/public/assets/illustrated/` (characters, enemies and props are at most 512 px on the longest side, the boss 640 px, backgrounds 1280 px and the floor 768 px). This cuts the download from 35 MB to about 9 MB. The renderer scales each illustration to its own display size, so these copies change sharpness only, not layout.
 
 After adding or replacing an original in `art-source/illustrated/`, run `npm run art:optimize`, then `npm run assets:validate`.
+
+## Frame animations (sprite strips)
+
+The game plays animation strips automatically when they are present:
+
+1. Copy the delivered strips and `animations.json` into `client/public/assets/animations/`. The repository ships an empty `animations.json` (`[]`).
+2. Each JSON entry needs `file`, `id` (`pyra_base`, `krios_glacier`, `enemy_pursuer`, `enemy_boss`, …), `animation`, `frames`, `frameWidth`, `frameHeight`, `fps`, `loop`, `anchorX` and `anchorY`.
+3. Run `npm run build`. Any form that has an `idle` strip switches from the single illustration to frame animation.
+
+| Form | Animations played |
+| --- | --- |
+| Heroes | `idle`, `run`, `attack1..3`, `skill1`, `skill2`, `dodge`, `downed` |
+| Enemies | `idle`, `move`/`walk`, `windup` (and `sweep_windup`/`strike_cast` for the boss), `attack`/`shoot`/`slam`/`sweep`, `hurt`, `channel`, `stagger`, `roar`, `death` |
+
+Missing animations fall back to the next suitable one. A form without strips keeps its illustration.

@@ -6,6 +6,9 @@ import {
   SLOTS,
   gearTotals,
   itemName,
+  effectiveStats,
+  reforgeCost,
+  upgradeCost,
   type BoxTier,
   type ItemInstance,
   type LineageId,
@@ -31,7 +34,7 @@ export function itemCardHtml(it: ItemInstance, extra = "") {
   const color = RARITY_COLORS[it.rarity];
   return `<div class="item-card rarity-${it.rarity}" style="--rar:${color}">
     <div class="item-head"><span class="item-icon">${SLOT_ICONS[it.slot]}</span><div><b>${esc(itemName(it))}</b><small>${t("rarity_" + it.rarity)} · ${t("slot_" + it.slot)}</small></div></div>
-    <ul>${statLines(it.stats).map((l) => `<li>${l}</li>`).join("")}</ul>
+    <ul>${statLines(effectiveStats(it)).map((l) => `<li>${l}</li>`).join("")}</ul>
     ${it.special ? `<p class="item-special">✦ ${t("special_" + it.special)}</p>` : ""}
     ${extra}
   </div>`;
@@ -134,7 +137,9 @@ export function renderArsenal(
                     it,
                     `${owner && !on ? `<small class="worn">${t("item_equipped_on", { lin: t(owner) })}</small>` : ""}
                      <div class="row"><button class="${on ? "ghost" : "primary"} eq" data-id="${it.id}" data-on="${on ? 1 : 0}">${on ? t("item_unequip") : t("item_equip")}</button>
-                     <button class="ghost dis" data-id="${it.id}">${t("item_dismantle", { n: LOOT.dismantleSalvage[it.rarity] })}</button></div>`,
+                     <button class="ghost dis" data-id="${it.id}">${t("item_dismantle", { n: LOOT.dismantleSalvage[it.rarity] })}</button></div>
+                     <div class="row">${upgradeCost(it) !== null ? `<button class="ghost upg" data-id="${it.id}" ${profile.salvage < upgradeCost(it)! ? "disabled" : ""}>${t("item_upgrade", { n: upgradeCost(it)! })}</button>` : `<small>${t("item_max_plus")}</small>`}
+                     <button class="ghost ref" data-id="${it.id}" ${profile.salvage < reforgeCost(it) ? "disabled" : ""}>${t("item_reforge", { n: reforgeCost(it) })}</button></div>`,
                   );
                 })
                 .join("")
@@ -157,6 +162,22 @@ export function renderArsenal(
           }
         };
       });
+      const improve = (kind: "upg" | "ref") =>
+        m.querySelectorAll<HTMLButtonElement>(`.${kind}`).forEach((btn) => {
+          btn.onclick = async () => {
+            try {
+              const r = kind === "upg" ? await api.upgradeItem(btn.dataset.id!) : await api.reforgeItem(btn.dataset.id!);
+              sfx(kind === "upg" ? "perfect" : "crate_open");
+              toast(`${itemName(r.item)} · ${statLines(effectiveStats(r.item)).join(" · ")}`, 3500);
+              m.remove();
+              onChange(r.profile);
+            } catch (e: any) {
+              toast(t("err_" + e.code));
+            }
+          };
+        });
+      improve("upg");
+      improve("ref");
       m.querySelectorAll<HTMLButtonElement>(".dis").forEach((btn) => {
         btn.onclick = async () => {
           const it = byId.get(btn.dataset.id!)!;

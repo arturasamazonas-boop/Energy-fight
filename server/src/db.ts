@@ -162,6 +162,10 @@ const MIGRATIONS: string[] = [
   );
   ALTER TABLE lineage_progress ADD COLUMN equipment JSONB NOT NULL DEFAULT '{}'::jsonb
   `,
+  // 3: item upgrade level
+  `
+  ALTER TABLE items ADD COLUMN plus INTEGER NOT NULL DEFAULT 0 CHECK (plus BETWEEN 0 AND 10)
+  `,
 ];
 
 async function migrate(db: Db) {

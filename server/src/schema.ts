@@ -35,6 +35,7 @@ export class PlayerS extends Schema {
   @type("uint8") tierUnlocked = 1;
   @type("string") auraRarity = "";
   @type("string") weaponRarity = "";
+  @type("uint16") gear = 0;
 }
 
 export class EnemyS extends Schema {
@@ -55,6 +56,7 @@ export class EnemyS extends Schema {
   @type("boolean") broken = false;
   @type("uint8") phase = 1;
   @type("float32") stagger = 0; // 0..1 of threshold (boss bar)
+  @type("string") elite = "";
 }
 
 export class HazardS extends Schema {

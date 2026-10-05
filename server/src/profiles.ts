@@ -19,6 +19,9 @@ import {
   SLOTS,
   type BoxTier,
   type ItemInstance,
+  reforgeItem,
+  reforgeCost,
+  upgradeCost,
 } from "@ef/shared";
 import type { Db, Queryer } from "./db.ts";
 
@@ -362,6 +365,41 @@ export class ProfileService {
     );
   }
 
+  /** +1 upgrade for salvage (max +5). */
+  upgradeItem(profileId: string, itemId: string) {
+    return this.withLock(profileId, () =>
+      this.db.tx(async (q) => {
+        const row = (await q.query(`SELECT * FROM items WHERE id = $1 AND profile_id = $2 FOR UPDATE`, [itemId, profileId]))[0];
+        if (!row) throw new LabError("not_found");
+        const cost = upgradeCost(rowToItem(row));
+        if (cost === null) throw new LabError("max_rank");
+        const p = (await q.query(`SELECT salvage FROM profiles WHERE id = $1 FOR UPDATE`, [profileId]))[0];
+        if (Number(p.salvage) < cost) throw new LabError("not_enough_salvage");
+        await q.query(`UPDATE profiles SET salvage = salvage - $2, updated_at = now() WHERE id = $1`, [profileId, cost]);
+        await q.query(`UPDATE items SET plus = plus + 1 WHERE id = $1`, [itemId]);
+        return { profile: await this.getProfile(profileId, q), item: rowToItem((await q.query(`SELECT * FROM items WHERE id = $1`, [itemId]))[0]) };
+      }),
+    );
+  }
+
+  /** Re-rolls secondary stats for salvage. */
+  reforgeItem(profileId: string, itemId: string, rng: () => number) {
+    return this.withLock(profileId, () =>
+      this.db.tx(async (q) => {
+        const row = (await q.query(`SELECT * FROM items WHERE id = $1 AND profile_id = $2 FOR UPDATE`, [itemId, profileId]))[0];
+        if (!row) throw new LabError("not_found");
+        const item = rowToItem(row);
+        const cost = reforgeCost(item);
+        const p = (await q.query(`SELECT salvage FROM profiles WHERE id = $1 FOR UPDATE`, [profileId]))[0];
+        if (Number(p.salvage) < cost) throw new LabError("not_enough_salvage");
+        const next = reforgeItem(item, rng);
+        await q.query(`UPDATE profiles SET salvage = salvage - $2, updated_at = now() WHERE id = $1`, [profileId, cost]);
+        await q.query(`UPDATE items SET stats = $2::jsonb WHERE id = $1`, [itemId, JSON.stringify(next.stats)]);
+        return { profile: await this.getProfile(profileId, q), item: next };
+      }),
+    );
+  }
+
   /** Breaks an item down into salvage; it is unequipped everywhere first. */
   dismantleItem(profileId: string, itemId: string) {
     return this.withLock(profileId, () =>
@@ -422,7 +460,7 @@ function rowToRecord(r: any): LineageRecord {
 }
 
 function rowToItem(r: any): ItemInstance {
-  return { id: r.id, baseId: r.base_id, slot: r.slot, rarity: r.rarity, stats: typeof r.stats === "string" ? JSON.parse(r.stats) : r.stats, special: r.special ?? null };
+  return { id: r.id, baseId: r.base_id, slot: r.slot, rarity: r.rarity, stats: typeof r.stats === "string" ? JSON.parse(r.stats) : r.stats, special: r.special ?? null, plus: Number(r.plus ?? 0) };
 }
 
 export interface BoxView {

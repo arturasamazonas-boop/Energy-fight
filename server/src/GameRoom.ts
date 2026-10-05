@@ -8,6 +8,7 @@ import {
   buildLoadout,
   carryMultiplier,
   isLineage,
+  gearScore,
   impactScores,
   rollBoxContents,
   rollBoxTier,
@@ -126,6 +127,7 @@ export class GameRoom extends Room {
     p.name = profile.name;
     p.tierUnlocked = profile.tierUnlocked;
     this.applyLobbyLineage(p, profile, lineage);
+    this.refreshGear(profileId, lineage, p);
     this.state.players.set(client.sessionId, p);
     this.seats.set(client.sessionId, {
       sessionId: client.sessionId,
@@ -143,6 +145,15 @@ export class GameRoom extends Room {
     });
     if (!this.state.leaderId) this.state.leaderId = client.sessionId;
     if (isLineage(options?.lineage)) this.svc.profiles.setLastLineage(profileId, lineage).catch(() => {});
+  }
+
+  private refreshGear(profileId: string, lineage: LineageId, p: PlayerS) {
+    this.svc.profiles
+      .equippedItems(profileId, lineage)
+      .then((items) => {
+        p.gear = Math.min(65535, gearScore(items));
+      })
+      .catch(() => {});
   }
 
   private applyLobbyLineage(p: PlayerS, profile: ProfileView, lineage: LineageId) {
@@ -171,6 +182,7 @@ export class GameRoom extends Room {
     if (!profile || this.state.phase !== "lobby") return;
     seat.lineage = m.lineage;
     this.applyLobbyLineage(p, profile, m.lineage);
+    this.refreshGear(seat.profileId, m.lineage, p);
     p.ready = false;
     this.svc.profiles.setLastLineage(seat.profileId, m.lineage).catch(() => {});
   }
@@ -523,6 +535,7 @@ export class GameRoom extends Room {
       s.broken = e.status.armorBreak.value > 0;
       s.phase = e.phase;
       s.stagger = e.kind === "boss" ? Math.min(1, e.stagger / e.staggerThreshold) : 0;
+      s.elite = e.elite;
     });
     syncMap(st.hazards, sim.hazards, HazardS, (s, h) => {
       s.id = h.id;

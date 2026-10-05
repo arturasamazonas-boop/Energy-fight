@@ -68,6 +68,10 @@ export interface SimPlayer {
   calmT: number;
 }
 
+export type EliteAffix = "armored" | "swift" | "volatile" | "regen";
+export const ELITE_AFFIXES: EliteAffix[] = ["armored", "swift", "volatile", "regen"];
+export const ELITE = { hp: 2.6, damage: 1.25, armorBonus: 0.25, swiftSpeed: 1.35, swiftCooldown: 1.45, regenPerSecond: 0.03, regenDelay: 3, volatileRadius: 95, volatileDelay: 0.9 } as const;
+
 export interface EnemyStatus {
   heat: { stacks: number; t: number };
   chill: { stacks: number; t: number };
@@ -102,6 +106,8 @@ export interface SimEnemy {
   phase: number;
   reinforced: number;
   bossCombo: string[];
+  elite: EliteAffix | "";
+  lastHitT: number;
 }
 
 export interface Hazard {
@@ -198,7 +204,7 @@ export class Sim {
   clears: SectionClear[] = [];
   private nextId = 1;
   private rng: () => number;
-  private spawnQueue: { kind: EnemyKind; x: number; y: number; required: boolean }[] = [];
+  private spawnQueue: { kind: EnemyKind; x: number; y: number; required: boolean; elite?: boolean }[] = [];
   private waveIndex = 0;
   private defendSpawnT = 0;
   private defendSpawnIdx = 0;
@@ -763,7 +769,8 @@ export class Sim {
 
   private damageEnemy(p: SimPlayer, e: SimEnemy, raw: number, stagger: number, flinch: boolean, knockback: number, fromX: number, fromY: number, kind?: string) {
     if (e.hp <= 0) return;
-    let armor = e.spec.armor;
+    let armor = e.spec.armor + (e.elite === "armored" ? ELITE.armorBonus : 0);
+    e.lastHitT = this.time;
     if (e.state === "stagger") armor = 0;
     armor = Math.max(0, armor - e.status.armorBreak.value * 2);
     let taken = 1 + (e.state === "stagger" ? BOSS.staggerDamageTaken : 0) + e.status.armorBreak.value * 0.5;
@@ -840,12 +847,15 @@ export class Sim {
 
   private killEnemy(e: SimEnemy) {
     this.enemies.delete(e.id);
-    if (e.kind !== "boss" && (PICKUPS.guaranteed.includes(e.kind) || this.rng() < PICKUPS.dropChance)) {
+    if (e.elite === "volatile") {
+      this.addHazard({ kind: "strike", side: "enemy", ownerId: e.id, x: e.x, y: e.y, r: ELITE.volatileRadius, delay: ELITE.volatileDelay, life: 0.1, dps: e.spec.damage * this.dmgMult * 1.4, slow: 0, vx: 0, vy: 0, stagger: 0, hitOnce: true });
+    }
+    if (e.kind !== "boss" && (e.elite || PICKUPS.guaranteed.includes(e.kind) || this.rng() < PICKUPS.dropChance)) {
       const id = `k${this.nextId++}`;
       this.pickups.set(id, { id, x: e.x, y: e.y, life: PICKUPS.life });
     }
     this.fx.push({ t: "death", id: e.id, kind: e.kind, x: e.x, y: e.y });
-    if (this.stage === "s2_defend") this.objective = Math.min(100, this.objective + 2.5);
+    if (this.stage === "s2_defend") this.objective = Math.min(100, this.objective + 2.1);
     if (e.kind === "boss") this.onBossDead(e);
   }
 
@@ -968,13 +978,14 @@ export class Sim {
   }
 
   // ---- enemies -----------------------------------------------------------------
-  spawn(kind: EnemyKind, x: number, y: number, required = true) {
+  spawn(kind: EnemyKind, x: number, y: number, required = true, elite = false) {
     if (this.enemies.size >= ENEMY_CAP) {
-      this.spawnQueue.push({ kind, x, y, required });
+      this.spawnQueue.push({ kind, x, y, required, elite });
       return;
     }
     const spec = ENEMY_SPECS[kind];
-    const hp = Math.round(spec.hp * (kind === "boss" ? this.hpMult.boss : this.hpMult.regular));
+    const affix: EliteAffix | "" = elite && kind !== "boss" ? ELITE_AFFIXES[Math.floor(this.rng() * ELITE_AFFIXES.length)] : "";
+    const hp = Math.round(spec.hp * (kind === "boss" ? this.hpMult.boss : this.hpMult.regular) * (affix ? ELITE.hp : 1));
     const id = `e${this.nextId++}`;
     const e: SimEnemy = {
       id,
@@ -1002,9 +1013,12 @@ export class Sim {
       phase: 1,
       reinforced: 0,
       bossCombo: [],
+      elite: affix,
+      lastHitT: 0,
     };
     this.enemies.set(id, e);
     if (kind === "boss") this.bossId = id;
+    if (affix) this.fx.push({ t: "msg", key: `elite_${affix}` });
     return e;
   }
 
@@ -1013,7 +1027,7 @@ export class Sim {
     let n = 0;
     while (this.spawnQueue.length && this.enemies.size < ENEMY_CAP && n < 2) {
       const s = this.spawnQueue.shift()!;
-      this.spawn(s.kind, s.x, s.y, s.required);
+      this.spawn(s.kind, s.x, s.y, s.required, s.elite);
       n++;
     }
   }
@@ -1051,7 +1065,7 @@ export class Sim {
     const ty = nav.y;
     const d = dist(e.x, e.y, tx, ty);
     if (d < 1) return;
-    const sp = e.spec.speed * (1 - this.slowOf(e)) * speedMul * DT;
+    const sp = e.spec.speed * (e.elite === "swift" ? ELITE.swiftSpeed : 1) * (1 - this.slowOf(e)) * speedMul * DT;
     const m = moveOnGround(e.x, e.y, ((tx - e.x) / d) * Math.min(sp, d), ((ty - e.y) / d) * Math.min(sp, d), this.maxX, e.spec.radius * 0.6);
     e.x = m.x;
     e.y = m.y;
@@ -1079,7 +1093,8 @@ export class Sim {
       e.y = m.y;
       e.knock.t -= DT;
     }
-    e.cd = Math.max(0, e.cd - DT * (1 - this.slowOf(e) * 0.5));
+    e.cd = Math.max(0, e.cd - DT * (1 - this.slowOf(e) * 0.5) * (e.elite === "swift" ? ELITE.swiftCooldown : 1));
+    if (e.elite === "regen" && this.time - e.lastHitT > ELITE.regenDelay && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + Math.ceil(e.maxHp * ELITE.regenPerSecond * DT));
     e.stagger = Math.max(0, e.stagger - DT * (e.kind === "boss" ? 6 : 10));
 
     if (e.kind === "boss") return this.tickBoss(e);
@@ -1169,7 +1184,7 @@ export class Sim {
     e.cd = e.spec.cooldown;
     e.attack = null;
     if (!a) return;
-    const dmg = e.spec.damage * this.dmgMult;
+    const dmg = e.spec.damage * this.dmgMult * (e.elite ? ELITE.damage : 1);
     if (a.kind === "shot") {
       const sp = 330;
       this.addHazard({ kind: "shot", side: "enemy", ownerId: e.id, x: e.x, y: e.y, r: 10, delay: 0, life: 1.3, dps: dmg, slow: 0, vx: Math.cos(a.ang) * sp, vy: Math.sin(a.ang) * sp, stagger: 0, hitOnce: true });
@@ -1202,10 +1217,10 @@ export class Sim {
       this.fx.push({ t: "msg", key: "boss_phase2" });
     }
     if (e.reinforced < BOSS.reinforceAt.length && hpFrac <= BOSS.reinforceAt[e.reinforced]) {
-      const wave: EnemyKind[] = e.reinforced === 0 ? ["pursuer", "pursuer", "ranged"] : ["pursuer", "pursuer", "armored", "support"];
+      const wave: string[] = e.reinforced === 0 ? ["pursuer", "pursuer", "ranged"] : ["pursuer*", "pursuer", "armored", "support"];
       e.reinforced++;
       const sp = MAP.sections[2].spawnPoints;
-      wave.forEach((k, i) => this.spawnQueue.push({ kind: k, x: sp[i % sp.length].x, y: sp[i % sp.length].y, required: true }));
+      wave.forEach((k, i) => this.spawnQueue.push({ ...parseSpawn(k), x: sp[i % sp.length].x, y: sp[i % sp.length].y, required: true }));
       this.fx.push({ t: "msg", key: "boss_reinforce" });
     }
     if (e.phase === 2) {
@@ -1468,14 +1483,14 @@ export class Sim {
             this.objectiveWork(p);
           }
         }
-        if (inZone) this.objective = Math.min(100, this.objective + 0.5 * DT);
+        if (inZone) this.objective = Math.min(100, this.objective + 0.42 * DT);
         this.defendSpawnT -= DT;
         if (this.defendSpawnT <= 0 && this.objective < 100 && this.enemies.size + this.spawnQueue.length < 7) {
           this.defendSpawnT = 6.5;
           const sp = MAP.sections[1].spawnPoints;
           const group = DEFEND_GROUPS[this.defendSpawnIdx % DEFEND_GROUPS.length];
           const p = sp[this.defendSpawnIdx % sp.length];
-          group.forEach((k, i) => this.spawnQueue.push({ kind: k, x: p.x - i * 20, y: p.y + (i % 2 ? 20 : -20), required: true }));
+          group.forEach((k, i) => this.spawnQueue.push({ ...parseSpawn(k), x: p.x - i * 20, y: p.y + (i % 2 ? 20 : -20), required: true }));
           this.defendSpawnIdx++;
         }
         if (this.objective >= 30 && !this.defendSpecials.has("support")) {
@@ -1539,12 +1554,13 @@ export class Sim {
     this.gainOd(p, OVERDRIVE.gainPerObjectiveSecond * DT);
   }
 
-  private spawnWave(kinds: EnemyKind[], points: { x: number; y: number }[]) {
+  private spawnWave(kinds: string[], points: { x: number; y: number }[]) {
     kinds.forEach((k, i) => {
       const p = points[i % points.length];
-      this.spawnQueue.push({ kind: k, x: p.x - Math.floor(i / points.length) * 30, y: p.y, required: true });
+      this.spawnQueue.push({ ...parseSpawn(k), x: p.x - Math.floor(i / points.length) * 30, y: p.y, required: true });
     });
   }
+
 
   private completeSection(id: number) {
     const eligibility = new Map<string, boolean>();
@@ -1619,17 +1635,24 @@ export function hashString(s: string) {
   return h >>> 0;
 }
 
-const WAVES_S1: EnemyKind[][] = [
+// "*" marks an elite (random affix, more HP, guaranteed bio-cell).
+const WAVES_S1: string[][] = [
   ["pursuer", "pursuer", "pursuer", "pursuer"],
   ["pursuer", "pursuer", "ranged", "ranged", "pursuer"],
-  ["armored", "pursuer", "pursuer", "ranged"],
+  ["armored", "pursuer", "pursuer*", "ranged"],
   ["pursuer", "pursuer", "support", "ranged", "pursuer"],
-  ["armored", "armored", "pursuer", "ranged", "pursuer"],
+  ["armored", "armored", "pursuer", "ranged*", "pursuer"],
+  ["pursuer*", "armored*", "ranged", "pursuer", "support"],
 ];
 
-const DEFEND_GROUPS: EnemyKind[][] = [
+const DEFEND_GROUPS: string[][] = [
   ["pursuer", "pursuer", "pursuer"],
   ["pursuer", "ranged"],
   ["pursuer", "pursuer", "ranged"],
   ["armored", "pursuer"],
+  ["pursuer*", "ranged", "pursuer"],
 ];
+
+function parseSpawn(s: string): { kind: EnemyKind; elite: boolean } {
+  return { kind: s.replace("*", "") as EnemyKind, elite: s.endsWith("*") };
+}

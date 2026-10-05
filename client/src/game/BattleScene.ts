@@ -20,6 +20,8 @@ import { sfx } from "./audio.ts";
 import type { Controls } from "./controls.ts";
 import type { Hud } from "./hud.ts";
 import { LootDrops } from "./lootDrops.ts";
+import { Tips } from "./tips.ts";
+import { AnimLibrary, stripScale } from "./animations.ts";
 import { TIER_RANK } from "./crate.ts";
 import { RARITY_COLORS, type BoxTier, type LootMsg, type Rarity } from "@ef/shared";
 
@@ -28,7 +30,9 @@ const sx = (x: number) => x;
 const sy = (y: number) => y * DS;
 
 interface PlayerView {
-  body: Phaser.GameObjects.Image;
+  body: Phaser.GameObjects.Sprite;
+  oneShot: string;
+  oneShotUntil: number;
   shadow: Phaser.GameObjects.Image;
   label: Phaser.GameObjects.Text;
   dx: number;
@@ -42,7 +46,7 @@ interface PlayerView {
   motion: number;
 }
 interface EnemyView {
-  body: Phaser.GameObjects.Image;
+  body: Phaser.GameObjects.Sprite;
   shadow: Phaser.GameObjects.Image;
   dx: number;
   dy: number;
@@ -103,6 +107,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   preload() {
+    this.animLib.preload(this);
     // A mission has a fixed roster. Do not download eight unused evolution
     // paintings for a new character's first run on a mobile connection.
     const party = (this.room.state as any).players;
@@ -158,12 +163,44 @@ export class BattleScene extends Phaser.Scene {
     this.controls.onAction = (a) => this.sendAction(a);
     this.offFns.push(this.room.onMessage("fx", (list: FxEvent[]) => list.forEach((f) => this.onFx(f))) as any);
     this.offFns.push(this.room.onMessage("deny", () => {}) as any);
+    this.animLib.create(this);
+    (window as any).__efScene = this;
     this.loot = new LootDrops(this, this.room.sessionId);
+    this.tips = new Tips(this.hud.root, (this.room.state as any).players?.get(this.room.sessionId)?.level ?? 1);
+    this.tips.show("move");
     this.offFns.push(this.room.onMessage("loot", (m: LootMsg) => this.onLoot(m)) as any);
     this.events.once("shutdown", () => this.cleanup());
   }
 
   private loot!: LootDrops;
+  private animLib = new AnimLibrary();
+  private tips!: Tips;
+  private tipClock = 0;
+
+  /** Beginner hints triggered by what is happening around the local player. */
+  private checkTips(st: any, me: any, dt: number) {
+    this.tipClock += dt;
+    if (!me) return;
+    if (this.tipClock > 7) this.tips.show("attack");
+    let nearWindup = false;
+    let elite = false;
+    st.enemies.forEach((e: any) => {
+      if (e.elite) elite = true;
+      if (e.state === "windup" && Math.hypot(e.x - me.x, e.y - me.y) < 170) nearWindup = true;
+    });
+    if (nearWindup) this.tips.show("dodge");
+    if (elite) this.tips.show("elite");
+    if (this.tipClock > 20 && me.cdS1 <= 0 && st.enemies.size > 0) this.tips.show("skill");
+    st.players.forEach((p: any, id: string) => {
+      if (id !== this.room.sessionId && p.life === "downed") this.tips.show("revive");
+    });
+    if (me.life === "downed") this.tips.show("downed");
+    if (st.pickups.size > 0) this.tips.show("pickup");
+    if (st.stage === "s2_activate") this.tips.show("stabilizer");
+    if (st.stage === "s3_boss") this.tips.show("boss");
+    if (me.hasOverdrive && me.od >= 100) this.tips.show("overdrive");
+    this.tips.update(dt);
+  }
 
   private onLoot(m: LootMsg) {
     this.loot.spawn(m);
@@ -177,6 +214,7 @@ export class BattleScene extends Phaser.Scene {
 
   private cleanup() {
     this.loot?.destroy();
+    this.tips?.destroy();
     for (const f of this.offFns) if (typeof f === "function") f();
     this.offFns = [];
   }
@@ -374,7 +412,11 @@ export class BattleScene extends Phaser.Scene {
     } else if ((a === "skill1" && me.cdS1 <= 0) || (a === "skill2" && me.cdS2 <= 0 && me.hasSkill2)) {
       sfx("skill");
       const v = this.players.get(this.room.sessionId);
-      if (v) v.lunge = 1;
+      if (v) {
+        v.lunge = 1;
+        v.oneShot = a;
+        v.oneShotUntil = performance.now() + 650;
+      }
     }
   }
 
@@ -428,6 +470,7 @@ export class BattleScene extends Phaser.Scene {
     this.drawGates(st);
     this.updateTransients(dt);
     this.loot.update(dt);
+    this.checkTips(st, me, dt);
     this.updateCamera(me, dt);
     this.drawMarkers(st, me);
     this.drawGroundEffects(st, now);
@@ -499,7 +542,11 @@ export class BattleScene extends Phaser.Scene {
         const spec = lin.combo.hits[L.step];
         this.swingFx(this.pred.x, this.pred.y, Math.atan2(this.facing.y, this.facing.x), spec.range, spec.arcDeg ?? 90, me.lineage, L.step, characterDisplayHeight(me.lineage, me.level, me.evolution) * .48);
         const v = this.players.get(this.room.sessionId);
-        if (v) v.lunge = 1;
+        if (v) {
+          v.lunge = 1;
+          v.oneShot = `attack${L.step + 1}`;
+          v.oneShotUntil = performance.now() + 380;
+        }
         sfx("swing");
         L.timer = lin.combo.interval[L.step];
         L.step = (L.step + 1) % 3;
@@ -521,16 +568,18 @@ export class BattleScene extends Phaser.Scene {
       const height = characterDisplayHeight(p.lineage, p.level, p.evolution);
       if (!view) {
         const shadow = this.add.image(0, 0, "shadow").setDepth(-600);
-        const body = this.add.image(0, 0, key).setOrigin(FEET.x / FRAME, FEET.y / FRAME);
+        const body = this.add.sprite(0, 0, key).setOrigin(FEET.x / FRAME, FEET.y / FRAME);
         const label = this.add.text(0, 0, p.name, {
           fontFamily: "system-ui, sans-serif", fontSize: "11px", fontStyle: "600",
           color: LINEAGE_COLORS[p.lineage as LineageId]?.glow ?? "#fff", stroke: "#10212a", strokeThickness: 3,
         }).setOrigin(.5, 1);
         const phase = [...id].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 13;
-        view = { body, shadow, label, dx: p.x, dy: p.y, texKey: key, lunge: 0, hitFlash: 0, aura: 0, height, gait: phase, motion: 0 };
+        view = { body, shadow, label, dx: p.x, dy: p.y, texKey: key, lunge: 0, hitFlash: 0, aura: 0, height, gait: phase, motion: 0, oneShot: "", oneShotUntil: 0 };
         this.players.set(id, view);
       }
-      if (view.texKey !== key) { view.body.setTexture(key); view.texKey = key; }
+      const formId = `${p.lineage}_${p.evolution || "base"}`;
+      const animated = this.animLib.has(formId);
+      if (!animated && view.texKey !== key) { view.body.setTexture(key); view.texKey = key; }
       const isMe = id === this.room.sessionId;
       const previousX = view.dx, previousY = view.dy;
       if (isMe && p.life === "alive") { view.dx = this.pred.x; view.dy = this.pred.y; }
@@ -552,12 +601,23 @@ export class BattleScene extends Phaser.Scene {
       const breath = settings.reducedMotion || !alive ? 0 : Math.sin(view.gait) * .012;
       const stepLift = Math.abs(Math.sin(view.gait)) * motion * 2;
       const hitPose = Math.sin(view.lunge * Math.PI);
+      if (animated) {
+        // Frame animation strips: pick the animation from the gameplay state.
+        const now = performance.now();
+        const wanted = !alive ? ["downed"] : p.act === "dash" ? ["dodge", "run"] : view.oneShotUntil > now ? [view.oneShot, "attack1", "idle"] : moving ? ["run", "idle"] : ["idle"];
+        const entry = this.animLib.drive(view.body, formId, wanted);
+        const scale = entry ? stripScale(entry, view.height) : 1;
+        view.body.setPosition(sx(view.dx), sy(view.dy));
+        if (fx < -.04) view.body.setFlipX(true); else if (fx > .04) view.body.setFlipX(false);
+        view.body.setScale(scale).setRotation(0);
+      } else {
       const scale = view.height / (artworkMetrics(key)?.bodyHeight ?? 220);
       view.body.setPosition(sx(view.dx) + fx * hitPose * 8, sy(view.dy) + fy * hitPose * 5 * DS - stepLift);
       if (fx < -.04) view.body.setFlipX(true); else if (fx > .04) view.body.setFlipX(false);
       view.body.setScale(scale * (1 - breath * .35 + hitPose * .055), scale * (1 + breath - hitPose * .02));
       const direction = view.body.flipX ? -1 : 1;
       view.body.setRotation(!alive ? direction * 1.15 : (direction * motion * .035 + fx * hitPose * .08));
+      }
       view.body.setAlpha(p.life === "waiting" ? .24 : p.connected ? (p.act === "dash" ? .63 : 1) : .48);
       if (view.hitFlash > .2) view.body.setTint(0xffb8a8).setTintMode(Phaser.TintModes.MULTIPLY);
       else view.body.clearTint();
@@ -590,9 +650,9 @@ export class BattleScene extends Phaser.Scene {
       const painted = `enemy.${enemy.kind}.provided`;
       const key = this.textures.exists(painted) ? painted : `enemy.${enemy.kind}`;
       if (!view) {
-        const height = ENEMY_DISPLAY_HEIGHT[enemy.kind] ?? 60;
+        const height = (ENEMY_DISPLAY_HEIGHT[enemy.kind] ?? 60) * (enemy.elite ? 1.2 : 1);
         const shadow = this.add.image(0, 0, "shadow").setDisplaySize(height * .9, height * .27).setDepth(-600);
-        const body = this.add.image(0, 0, key).setOrigin(FEET.x / FRAME, FEET.y / FRAME);
+        const body = this.add.sprite(0, 0, key).setOrigin(FEET.x / FRAME, FEET.y / FRAME);
         view = { body, shadow, dx: enemy.x, dy: enemy.y, flash: 0, kind: enemy.kind, height, gait: id.length * 1.7, motion: 0 };
         this.enemies.set(id, view);
       }
@@ -608,11 +668,26 @@ export class BattleScene extends Phaser.Scene {
       const pulse = animate ? Math.sin(view.gait) : 0;
       const wobble = winding && animate ? Math.sin(performance.now() / 42) * 1.4 : 0;
       const hover = enemy.kind === "support" ? 6 + pulse * 2 : animate ? Math.abs(pulse) * view.motion * 1.6 : 0;
+      const enemyForm = `enemy_${enemy.kind}`;
+      if (this.animLib.has(enemyForm)) {
+        const wanted =
+          enemy.state === "stagger" ? ["stagger", "hurt", "idle"]
+          : enemy.state === "channel" ? ["channel", "idle"]
+          : enemy.state === "roar" ? ["roar", "idle"]
+          : enemy.state === "flinch" ? ["hurt", "idle"]
+          : winding ? (enemy.atk === "sweep" ? ["sweep_windup", "windup"] : enemy.atk === "strikes" ? ["strike_cast", "windup"] : ["windup"])
+          : enemy.state === "recover" && enemy.atk === "" ? ["attack", "shoot", "slam", "sweep", "idle"]
+          : view.motion > .3 ? ["move", "walk", "idle"] : ["idle"];
+        const entry = this.animLib.drive(view.body, enemyForm, wanted);
+        view.body.setPosition(sx(view.dx), sy(view.dy) - (enemy.kind === "support" ? 6 : 0)).setScale(entry ? stripScale(entry, view.height) : 1).setRotation(0);
+        if (enemy.fx < -.04) view.body.setFlipX(true); else if (enemy.fx > .04) view.body.setFlipX(false);
+      } else {
       const scale = view.height / (artworkMetrics(painted)?.bodyHeight ?? 220);
       view.body.setPosition(sx(view.dx) + wobble, sy(view.dy) - hover);
       view.body.setScale(scale * (1 + pulse * .013), scale * (1 - pulse * .012));
       if (enemy.fx < -.04) view.body.setFlipX(true); else if (enemy.fx > .04) view.body.setFlipX(false);
       view.body.setRotation(winding ? -.035 * Math.sign(enemy.fx || 1) : pulse * view.motion * .02);
+      }
       view.body.setDepth(sy(view.dy));
       view.shadow.setPosition(sx(view.dx), sy(view.dy) + 1).setAlpha(enemy.kind === "support" ? .55 : .9);
       if (view.flash > .15) view.body.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
@@ -745,6 +820,16 @@ export class BattleScene extends Phaser.Scene {
       if (e.broken) {
         g.lineStyle(2, 0xe0b85a, 1);
         g.strokeRect(x + w / 2 + 3, top - 3, 7, 7);
+      }
+      if (e.elite) {
+        // Elite: pulsing ground ring and a crown in the affix colour.
+        const col = ELITE_COLORS[e.elite] ?? 0xffd257;
+        const pulse = 0.55 + 0.35 * Math.sin(performance.now() / 160);
+        g.lineStyle(3, col, pulse);
+        g.strokeEllipse(x, sy(v.dy), w * 1.9, w * 1.9 * DS);
+        g.fillStyle(col, 1);
+        for (let k = -1; k <= 1; k++) g.fillTriangle(x + k * 7 - 4, top - 14, x + k * 7 + 4, top - 14, x + k * 7, top - 22 - (k === 0 ? 4 : 0));
+        g.fillRect(x - 11, top - 14, 22, 3);
       }
     });
     st.players.forEach((p: any, id: string) => {
@@ -1030,7 +1115,11 @@ export class BattleScene extends Phaser.Scene {
         if (f.id !== myId) {
           this.swingFx(f.x, f.y, f.ang, f.range, f.arc, f.lin, f.step, (this.players.get(f.id)?.height ?? 58) * .48);
           const v = this.players.get(f.id);
-          if (v) v.lunge = 1;
+          if (v) {
+            v.lunge = 1;
+            v.oneShot = `attack${f.step + 1}`;
+            v.oneShotUntil = performance.now() + 380;
+          }
         }
         break;
       case "hit": {
@@ -1089,6 +1178,15 @@ export class BattleScene extends Phaser.Scene {
         break;
       case "death":
         sfx("death");
+        {
+          const death = this.animLib.pick(`enemy_${f.kind}`, ["death"]);
+          if (death) {
+            const corpse = this.add.sprite(sx(f.x), sy(f.y), "").setDepth(sy(f.y));
+            this.animLib.drive(corpse, `enemy_${f.kind}`, ["death"]);
+            corpse.setScale(stripScale(death, ENEMY_DISPLAY_HEIGHT[f.kind] ?? 60));
+            corpse.once("animationcomplete", () => corpse.destroy());
+          }
+        }
         this.addTransient(0.45, (g, k) => {
           g.fillStyle(0x7a3a60, 0.6 * (1 - k));
           g.fillEllipse(sx(f.x), sy(f.y), 40 + 50 * k, (40 + 50 * k) * DS);
@@ -1233,6 +1331,8 @@ export class BattleScene extends Phaser.Scene {
   }
 
 }
+
+const ELITE_COLORS: Record<string, number> = { armored: 0x9fc4ff, swift: 0x7dffa0, volatile: 0xff6a3a, regen: 0xd8ffcf };
 
 function wedge(g: Phaser.GameObjects.Graphics, x: number, y: number, r: number, ang: number, arc: number, fillOnly = false) {
   g.beginPath();

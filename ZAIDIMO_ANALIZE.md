@@ -16,13 +16,20 @@
 | 8 | Inventorius galėjo augti be ribos. | Riba 150 daiktų. Viršijus ją, silpniausi nedėvimi daiktai automatiškai išardomi į laužą. |
 | 9 | Dėžės ar daiktai galėjo būti dubliuoti. | Dėžė serveryje išduodama vieną kartą (raktas: misija + profilis). Daiktai saugomi duomenų bazėje. Klientas nieko nesprendžia. |
 
+## Antras taisymų etapas
+
+| Spraga | Kas padaryta |
+| --- | --- |
+| Misija per trumpa ir monotoniška | **Elitiniai priešai** su karūna ir keturiomis savybėmis: šarvuotas, greitas, sprogus (po mirties sprogsta) ir atsinaujinantis. Jie stipresni, bet visada palieka gydančią ląstelę. Pridėta 6-a banga, gynybos dalis ilgesnė. Robotų misija dabar trunka 4–7,5 min. (anksčiau 3–5), visos linijos laimi net vienos. |
+| Nebuvo kur išleisti laužo | **Daiktų tobulinimas** +1…+5 (kiekvienas lygis +6% visoms savybėms) ir **perkalimas**: antrinės savybės perridenamos, pagrindinė lieka. |
+| Naujokui nebuvo paaiškinimų | **Patarimai pirmose misijose**: judėjimas, smūgiai, raudonos zonos, išsisukimas, įgūdžiai, draugo pakėlimas, ląstelės, stabilizatorius, bosas, elitiniai priešai, perkrova. Kiekvienas rodomas vieną kartą; 7+ lygio žaidėjams nerodomi. |
+| Laukiamajame nesimatė komandos jėgos | Prie kiekvieno žaidėjo rodoma **ekipuotės galia**. |
+| Animacijos | Paruoštas **animacijų grojimas**: ChatGPT kadrų juostas įdėjus į `client/public/assets/animations/`, veikėjai ir priešai jas groja automatiškai pagal veiksmą. Patikrinta su bandomosiomis juostomis. |
+
 ## Didžiausios likusios spragos (pagal svarbą)
 
-1. **Animacijos.** Dabar kiekvienas veikėjas turi vieną pozą, o judesį imituoja kodas. Tai didžiausias žingsnis iki „nerealiai gražu“. ChatGPT promptas animacijoms paruoštas. Gavęs kadrų juostas, prijungsiu jų grojimą.
-2. **Misijos tempas.** Robotai misiją praeina per 3–5 min., užduotyje tikslas buvo 10–15 min. Reikia gyvo žaidimo testo. Siūlau pridėti elitinius priešus su savybėmis ir dar vieną bangą gynybos dalyje.
+1. **Animacijų piešiniai.** Grojimas jau paruoštas, trūksta pačių ChatGPT kadrų juostų. Tai didžiausias žingsnis iki „nerealiai gražu“.
+2. **Misijos tempas.** Pailginta, bet reikia gyvo žaidimo testo, ar tempas jaučiasi gerai.
 3. **Turinys.** Yra vienas žemėlapis ir vienas bosas. Kitas žingsnis: antras bosas su kitokia mechanika ir dienos iššūkis su garantuota bent auksine dėže.
-4. **Daiktų tobulinimas.** Dabar daiktą galima tik išardyti. Siūlau perdirbimą (savybių perridenimą už laužą), kad būtų kur išleisti laužą.
-5. **Garsas.** Garsai kol kas sintetiniai. Reikia tikrų smūgių, dėžių atidarymo garsų ir muzikos.
-6. **Mokymas.** Nėra pirmos minutės pamokos (judėk, smok, išsisuk). Mažam žaidėjui ji svarbi.
-7. **Komandos ekipuotės matomumas.** Laukiamajame nesimato draugų „galios“. Siūlau rodyti ekipuotės lygį.
-8. **Telefonų našumas.** Kadrų dažnis tikruose telefonuose dar nematuotas.
+4. **Garsas.** Garsai kol kas sintetiniai. Reikia tikrų smūgių, dėžių atidarymo garsų ir muzikos.
+5. **Telefonų našumas.** Kadrų dažnis tikruose telefonuose dar nematuotas.

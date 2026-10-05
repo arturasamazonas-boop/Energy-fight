@@ -83,7 +83,7 @@ export function renderLobby(root: HTMLElement, room: Room, profile: ProfileView,
     st.players.forEach((p: any, id: string) => {
       rows.push(`<div class="prow${p.connected ? "" : " dc"}${id === room.sessionId ? " is-me" : ""}" style="--lin:${UI_LINEAGE_COLORS[p.lineage as LineageId]}">
         <div class="player-art">${portraitHtml(p.lineage, p.evolution ?? "", p.level, "roster-art")}</div>
-        <div class="player-info"><b>${esc(p.name)}${id === room.sessionId ? `<small class="you-tag">${UI_COPY.you}</small>` : ""}</b><span>${t(p.lineage)} · ${t("level_short")} ${p.level}</span>
+        <div class="player-info"><b>${esc(p.name)}${id === room.sessionId ? `<small class="you-tag">${UI_COPY.you}</small>` : ""}</b><span>${t(p.lineage)} · ${t("level_short")} ${p.level}${p.gear ? ` · <b class="gear-chip" title="${t("gear_score")}">⚔ ${p.gear}</b>` : ""}</span>
           <div class="player-badges">${st.leaderId === id ? `<em class="lead">${t("leader")}</em>` : ""}<em class="${p.ready ? "ok" : "no"}">${p.ready ? icon("check") : ""}${p.ready ? t("ready") : t("not_ready")}</em></div>
         </div></div>`);
     });

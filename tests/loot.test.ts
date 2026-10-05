@@ -177,3 +177,53 @@ test("crate grant is idempotent; equip moves items between lineages; dismantle g
   await assert.rejects(svc.equipItem(other.profile.id, "pyra", contents.items[1].slot, contents.items[1].id), /not_found/);
   await db.close();
 });
+
+test("item upgrade (+1..+5) and reforge cost salvage and change stats", async () => {
+  const { effectiveStats, upgradeCost, reforgeCost, gearScore } = await import("../shared/src/index.ts");
+  const db = await openDb({});
+  const svc = new ProfileService(db);
+  const { profile } = await svc.createGuest("Smith", { salvage: 1000 });
+  const item = rollItem("epic", mulberry(4), () => crypto.randomUUID(), "weapon");
+  await svc.grantBox({ runId: "r-up", profileId: profile.id, tier: "gold", impact: 1, performance: 0.5, salvage: 0, items: [item] });
+  const base = effectiveStats(item).damage!;
+  let r = await svc.upgradeItem(profile.id, item.id);
+  assert.equal(r.item.plus, 1);
+  assert.ok(effectiveStats(r.item).damage! > base);
+  assert.equal(r.profile!.salvage, 1000 - upgradeCost(item)!);
+  for (let i = 0; i < 4; i++) r = await svc.upgradeItem(profile.id, item.id);
+  assert.equal(r.item.plus, 5);
+  await assert.rejects(svc.upgradeItem(profile.id, item.id), /max_rank/);
+  const before = r.profile!.salvage;
+  const f = await svc.reforgeItem(profile.id, item.id, mulberry(99));
+  assert.equal(f.profile!.salvage, before - reforgeCost(item));
+  assert.equal(f.item.stats.damage, item.stats.damage, "primary stat kept");
+  assert.equal(Object.keys(f.item.stats).length, Object.keys(item.stats).length);
+  assert.ok(gearScore([r.item]) > gearScore([item]));
+  const poor = await svc.createGuest("Poor");
+  const it2 = rollItem("ultra", mulberry(5), () => crypto.randomUUID(), "aura");
+  await svc.grantBox({ runId: "r-poor", profileId: poor.profile.id, tier: "ultra", impact: 1, performance: 0.5, salvage: 0, items: [it2] });
+  await assert.rejects(svc.upgradeItem(poor.profile.id, it2.id), /not_enough_salvage/);
+  await db.close();
+});
+
+test("elite enemies: tougher, affix effects, guaranteed bio-cell", async () => {
+  const { ELITE } = await import("../shared/src/index.ts");
+  const sim = new Sim({ runId: "elite", tier: 1, partySize: 1, seed: 2 });
+  sim.addPlayer("p", "pp", "P", loadoutFor("litos", 10));
+  const normal = sim.spawn("pursuer", 900, 300)!;
+  const elite = sim.spawn("pursuer", 950, 300, true, true)!;
+  assert.ok(elite.elite);
+  assert.equal(elite.maxHp, Math.round(normal.maxHp * ELITE.hp));
+  elite.elite = "volatile";
+  elite.hp = 1;
+  (sim as any).killEnemy(elite);
+  assert.equal(sim.pickups.size, 1, "elite always drops a bio-cell");
+  assert.ok([...sim.hazards.values()].some((h) => h.kind === "strike" && h.side === "enemy"), "volatile elite leaves an explosion telegraph");
+  const regen = sim.spawn("pursuer", 1000, 300, true, true)!;
+  regen.elite = "regen";
+  regen.state = "flinch";
+  regen.t = 99;
+  regen.hp = Math.round(regen.maxHp / 2);
+  for (let i = 0; i < 100; i++) sim.tick();
+  assert.ok(regen.hp > regen.maxHp / 2, "regenerating elite heals when not hit");
+});
