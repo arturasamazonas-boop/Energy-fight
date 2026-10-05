@@ -9,6 +9,7 @@ import {
   type Patch,
 } from "./config.ts";
 import { damageScale, healthScale } from "./progression.ts";
+import { gearTotals, type GearTotals, type ItemInstance } from "./loot.ts";
 
 export interface LineageRecord {
   lineage: LineageId;
@@ -19,6 +20,8 @@ export interface LineageRecord {
   fragments: number;
   moduleEquipped: string | null;
   moduleRanks: Record<string, number>;
+  /** Equipped item id per slot (items belong to the profile's shared inventory). */
+  equipment?: Partial<Record<string, string>>;
 }
 
 export interface Loadout {
@@ -34,6 +37,7 @@ export interface Loadout {
   hasSkill2: boolean;
   hasOverdrive: boolean;
   mastery: boolean;
+  gear: GearTotals;
 }
 
 function clone<T>(v: T): T {
@@ -62,7 +66,7 @@ export function modifierIds(lineage: LineageId): [string, string] {
   return [m[0].id, m[1].id];
 }
 
-export function buildLoadout(rec: LineageRecord): Loadout {
+export function buildLoadout(rec: LineageRecord, equipped: ItemInstance[] = []): Loadout {
   const spec = clone(LINEAGE_SPECS[rec.lineage]);
   const level = Math.max(1, Math.min(PLAYER.levelCap, rec.level));
   let evolution: string | null = null;
@@ -90,6 +94,12 @@ export function buildLoadout(rec: LineageRecord): Loadout {
       module = { id: m.id, rank };
     }
   }
+  // Equipment: bounded stat bonuses (caps in loot.ts) plus special effects used by the sim.
+  const gear = gearTotals(equipped);
+  if (gear.stats.cooldown > 0) {
+    spec.skill1.cooldown *= 1 - gear.stats.cooldown;
+    spec.skill2.cooldown *= 1 - gear.stats.cooldown;
+  }
   return {
     lineage: rec.lineage,
     level,
@@ -97,12 +107,13 @@ export function buildLoadout(rec: LineageRecord): Loadout {
     modifier,
     module,
     spec,
-    maxHp: Math.round(PLAYER.baseHp * spec.hpMult * healthScale(level)),
-    damage: PLAYER.baseDamage * spec.damageMult * damageScale(level),
-    moveSpeed: PLAYER.moveSpeed * spec.speedMult,
+    maxHp: Math.round(PLAYER.baseHp * spec.hpMult * healthScale(level) * (1 + gear.stats.health)),
+    damage: PLAYER.baseDamage * spec.damageMult * damageScale(level) * (1 + gear.stats.damage),
+    moveSpeed: PLAYER.moveSpeed * spec.speedMult * (1 + gear.stats.speed),
     hasSkill2: level >= UNLOCKS.skill2,
     hasOverdrive: level >= UNLOCKS.overdrive,
     mastery: level >= UNLOCKS.mastery,
+    gear,
   };
 }
 

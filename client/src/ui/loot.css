@@ -1,0 +1,75 @@
+/* ---- Item cards ---------------------------------------------------------- */
+.item-card { position: relative; background: linear-gradient(160deg, #18222b, #0e151b); border: 1px solid color-mix(in srgb, var(--rar) 70%, transparent); border-radius: 14px; padding: 10px 12px; color: #e9eef2; box-shadow: 0 0 0 1px #0006 inset, 0 6px 18px #0006, 0 0 18px color-mix(in srgb, var(--rar) 25%, transparent); text-align: left; }
+.item-card .item-head { display: flex; gap: 10px; align-items: center; }
+.item-card .item-icon { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; font-size: 20px; background: radial-gradient(circle, color-mix(in srgb, var(--rar) 45%, transparent), #0000 70%), #0b1116; border: 1px solid color-mix(in srgb, var(--rar) 60%, transparent); }
+.item-card b { display: block; color: var(--rar); font-size: 15px; }
+.item-card small { color: #9fb0bf; }
+.item-card ul { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; }
+.item-card li { margin: 2px 0; color: #cfe3d5; }
+.item-card .item-special { margin: 6px 0 0; font-size: 12.5px; color: #ffe08a; }
+.item-card .row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.item-card .worn { display: block; margin-top: 6px; color: #ffb36b; }
+.item-card.rarity-legendary, .item-card.rarity-mythic { box-shadow: 0 0 0 1px #0006 inset, 0 0 26px color-mix(in srgb, var(--rar) 45%, transparent); }
+.item-card.rarity-ultra { border-color: transparent; background: linear-gradient(#111a22, #0c1218) padding-box, linear-gradient(90deg, #ff7dfa, #7dfff0, #fff27d, #ff7dfa) border-box; border: 2px solid transparent; animation: ultraHue 3s linear infinite; }
+@keyframes ultraHue { to { filter: hue-rotate(360deg); } }
+.item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; max-height: 60vh; overflow: auto; padding: 4px; }
+.modal-box.wide { width: min(780px, 100%); }
+
+/* ---- Arsenal --------------------------------------------------------------- */
+.arsenal .arsenal-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.arsenal .boxes-btn b { display: inline-grid; place-items: center; min-width: 22px; height: 22px; border-radius: 11px; background: #ffcf4a; color: #251a00; margin-left: 4px; font-size: 13px; }
+.arsenal .boxes-btn.has { border-color: #ffcf4a; box-shadow: 0 0 14px #ffcf4a55; animation: boxNudge 2.4s ease-in-out infinite; }
+@keyframes boxNudge { 50% { transform: translateY(-2px); } }
+.slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.slot { min-width: 0; display: grid; grid-template-columns: 30px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 8px; align-items: center; text-align: left; padding: 8px 10px; min-height: 62px; border-radius: 12px; border: 1px dashed #c9bda4; background: #fffaf0b8; color: #34433b; box-shadow: none; }
+.slot .slot-icon { grid-row: span 2; font-size: 20px; opacity: .55; }
+.slot small { font-size: 10.5px; opacity: .75; text-transform: uppercase; letter-spacing: .06em; }
+.slot b { font-size: 12.5px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: #6b766f; font-weight: 600; }
+.slot.filled { border: 2px solid var(--rar); background: linear-gradient(135deg, color-mix(in srgb, var(--rar) 26%, #fff8ec), #fff8ec); box-shadow: 0 0 12px color-mix(in srgb, var(--rar) 40%, transparent); }
+.slot.filled .slot-icon { opacity: 1; }
+.slot.filled b { color: color-mix(in srgb, var(--rar) 55%, #1d2420); font-weight: 800; }
+.gear-bonus, .gear-specials { margin-top: 8px; }
+.gear-specials { color: #ffe08a; }
+@media (max-width: 760px) { .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---- Crate badges & list ---------------------------------------------------------- */
+.crate-badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: .04em; color: #10161b; background: var(--tier); box-shadow: 0 0 10px color-mix(in srgb, var(--tier) 60%, transparent); }
+.crate-badge.tier-platinum, .crate-badge.tier-divine { animation: badgeGlow 1s ease-in-out infinite alternate; }
+.crate-badge.tier-ultra { background: linear-gradient(90deg, #ff7dfa, #7dfff0, #fff27d); animation: ultraHue 2s linear infinite; }
+@keyframes badgeGlow { to { box-shadow: 0 0 22px var(--tier), 0 0 4px #fff; } }
+.result-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.result-box .open-box { min-height: 36px; padding: 6px 12px; }
+.box-list { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow: auto; }
+.box-row small { color: #8fa0ae; }
+.box-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 12px; background: #0c1319; border: 1px solid #ffffff14; }
+.box-row .box-thumb canvas { display: block; }
+.box-row button { margin-left: auto; }
+
+/* ---- Reveal ------------------------------------------------------------------------ */
+.reveal { position: fixed; inset: 0; z-index: 3000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; overflow: hidden; color: #fff;
+  background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--tier) 28%, #0b0f14) 0%, #05070a 70%); padding: 16px; }
+.reveal-title { text-align: center; z-index: 2; }
+.reveal-title h2 { margin: 0; font-size: clamp(22px, 5vw, 40px); letter-spacing: .08em; color: var(--tier); text-shadow: 0 0 18px var(--tier); }
+.reveal-title .wow { display: block; font-size: clamp(28px, 7vw, 64px); font-weight: 900; letter-spacing: .1em; color: #fff; text-shadow: 0 0 24px var(--tier), 0 0 6px #fff; animation: wowPulse .5s ease-in-out infinite alternate; }
+@keyframes wowPulse { to { transform: scale(1.08); } }
+.reveal-crate { z-index: 2; filter: drop-shadow(0 0 22px var(--tier)); animation: crateShake .12s linear infinite, crateGrow 1.6s ease-in forwards; }
+.reveal.open .reveal-crate { animation: crateBurst .5s ease-out forwards; }
+@keyframes crateShake { 0% { transform: rotate(-2deg); } 50% { transform: rotate(2deg) translateY(-2px); } 100% { transform: rotate(-2deg); } }
+@keyframes crateGrow { to { filter: drop-shadow(0 0 60px var(--tier)) brightness(1.25); } }
+@keyframes crateBurst { 0% { transform: scale(1.25); filter: drop-shadow(0 0 90px #fff) brightness(2); } 100% { transform: scale(.7); opacity: .85; } }
+.reveal-rays { position: absolute; inset: -50%; background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--tier) 35%, transparent) 0deg 8deg, transparent 8deg 22deg); opacity: .18; animation: raySpin 14s linear infinite; mask-image: radial-gradient(circle, #000 15%, transparent 60%); }
+.reveal.epic .reveal-rays { opacity: .5; animation-duration: 6s; }
+.reveal.tier-divine .reveal-rays, .reveal.tier-ultra .reveal-rays { opacity: .75; animation: raySpin 4s linear infinite, flicker .09s steps(2) infinite; }
+.reveal.tier-ultra { animation: ultraHue 2.5s linear infinite; }
+@keyframes flicker { 50% { opacity: .45; } }
+.reveal-sparks i { position: absolute; left: calc(50% + (var(--i) * 37px % 600px) - 300px); top: 110%; width: 6px; height: 6px; border-radius: 50%; background: #fff; box-shadow: 0 0 10px var(--tier), 0 0 3px #fff; animation: rise calc(2.2s + var(--i) * 0.13s) linear infinite; animation-delay: calc(var(--i) * -0.21s); }
+@keyframes rise { to { transform: translateY(-140vh) translateX(calc((var(--i) - 14) * 4px)); opacity: 0; } }
+.reveal-items { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; z-index: 2; max-width: 980px; }
+.reveal-item { width: min(260px, 80vw); opacity: 0; transform: translateY(30px) scale(.8); animation: itemIn .55s cubic-bezier(.2, 1.4, .4, 1) forwards; }
+@keyframes itemIn { to { opacity: 1; transform: none; } }
+.reveal-actions { z-index: 2; display: flex; gap: 14px; align-items: center; opacity: 0; transition: opacity .4s 1.2s; }
+.reveal.open .reveal-actions { opacity: 1; }
+.reveal-salvage { color: #ffd890; font-weight: 700; }
+.reveal.calm *, .reveal.calm { animation-duration: 0s !important; animation-iteration-count: 1 !important; }
+@media (max-height: 430px) { .reveal { gap: 4px; } .reveal-crate canvas { width: 130px; height: 130px; } .reveal-item { width: 220px; } }
+@keyframes raySpin { to { transform: rotate(360deg); } }

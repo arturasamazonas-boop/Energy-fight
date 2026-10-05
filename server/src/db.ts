@@ -134,6 +134,34 @@ const MIGRATIONS: string[] = [
     result TEXT
   );
   `,
+  // 2: loot crates and equipment
+  `
+  CREATE TABLE items (
+    id TEXT PRIMARY KEY,
+    profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    base_id TEXT NOT NULL,
+    slot TEXT NOT NULL,
+    rarity TEXT NOT NULL,
+    stats JSONB NOT NULL,
+    special TEXT,
+    source_run TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+  CREATE INDEX items_profile_idx ON items (profile_id);
+  CREATE TABLE loot_boxes (
+    run_id TEXT NOT NULL,
+    profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    tier TEXT NOT NULL,
+    impact REAL NOT NULL,
+    performance REAL NOT NULL,
+    salvage INTEGER NOT NULL,
+    item_ids JSONB NOT NULL,
+    opened BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (run_id, profile_id)
+  );
+  ALTER TABLE lineage_progress ADD COLUMN equipment JSONB NOT NULL DEFAULT '{}'::jsonb
+  `,
 ];
 
 async function migrate(db: Db) {

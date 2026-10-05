@@ -1,4 +1,5 @@
 import "./styles.css";
+import "./ui/loot.css";
 import Phaser from "phaser";
 import type { Room } from "@colyseus/sdk";
 import { LINEAGES, type LineageId, type ResultsMsg } from "@ef/shared";
@@ -156,6 +157,7 @@ function enterRoom(r: Room) {
   r.onMessage("reward", () => {});
   r.onMessage("pong", () => {});
   r.onMessage("fx", () => {});
+  r.onMessage("loot", () => {});
   r.onMessage("deny", () => {});
   r.onMessage("results", (res: ResultsMsg) => {
     lastResults = res;

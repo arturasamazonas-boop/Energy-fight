@@ -69,3 +69,26 @@ A window counts as able-to-act if the body was alive for at least half of it. A 
 - The illustrated art uses one right-facing painted pose per form and mirrors it. Runtime motion supplies breathing, bob, lean, lunge, hit feedback and elemental effects. Source images are normalized around their visible feet before GPU upload; this does not alter collision geometry or source PNG files. See `ART_GUIDE.md` for the 23-image inventory and scaling contract.
 - Checkpoint behaviour: clearing a section heals the living players and revives downed or waiting ones at the next section's entrance.
 - Room codes are 5 characters from an alphabet without O, 0, I or 1.
+
+## Boss crates and equipment
+
+- When the boss dies, the server snapshots every non-departed participant. A crate goes to each one who is still eligible in section 3 (the participation rule so far). Departed and AFK players get nothing.
+- **Impact** (`shared/src/loot.ts → impactScores`):
+  - Damage and stagger are divided by the player's level damage scale.
+  - Each contribution (damage 45%, stagger 15%, control 15%, objective 15%, revives 10%) is taken as a share of the party total. `relative = 1` is an average share, and solo play is always 1.
+  - `p = clamp(0.25 + 0.45·relative − 0.08·downs + 0.05·(tier−1), 0, 1)`.
+- **Crate tier:** the rare tiers are rolled first with chance × (0.5 + p): ULTRA 1/10 000, divine 1/1 000, platinum 1/100. Otherwise gold `0.05+0.35p`, silver `0.25+0.25p`, the rest bronze. The rolls use `crypto.randomInt` on the server.
+- **Contents:** items and salvage per tier (`BOX_CONTENTS`). An ULTRA crate always contains one unique ULTRA item.
+- **Items:**
+  - 6 slots, 6 base items per slot, 6 rarities.
+  - Every slot has a primary stat.
+  - Rarity sets the number of stats and their power.
+  - Epic and higher can carry one of 8 specials (`SPECIAL_VALUES`).
+  - Stat sums across the six slots are capped (`LOOT.statCap`).
+  - Equipment is per lineage, and one item can be worn by only one lineage at a time.
+  - It is snapshotted at run start like the rest of the loadout.
+- **Persistence:**
+  - `loot_boxes (run_id, profile_id)` is inserted once with `ON CONFLICT DO NOTHING`, together with the `items` rows and the crate salvage, in one transaction.
+  - `lineage_progress.equipment` maps slot to item id.
+  - Over 150 items, the weakest unequipped ones are salvaged automatically.
+- **API:** `GET /api/inventory`, `POST /api/boxes/open`, `POST /api/items/equip`, `POST /api/items/dismantle`. `POST /api/dev/box` exists only with dev tools enabled.

@@ -38,7 +38,7 @@ export class NetBot {
   }
   private wire(room: Room) {
     this.room = room;
-    for (const type of ["fx", "results", "reward", "error", "rejected", "deny", "pong"]) {
+    for (const type of ["fx", "results", "reward", "error", "rejected", "deny", "pong", "loot"]) {
       room.onMessage(type, (m: any) => {
         if (type === "fx") return;
         (this.messages[type] ??= []).push(m);

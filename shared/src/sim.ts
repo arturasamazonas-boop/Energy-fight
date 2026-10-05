@@ -22,6 +22,7 @@ import { normalizeInput, stepMovement } from "./movement.ts";
 import { SectionParticipation } from "./participation.ts";
 import { partyScaling, tierSpec } from "./progression.ts";
 import type { ActionKind, FxEvent } from "./protocol.ts";
+import { LOOT, SPECIAL_VALUES } from "./loot.ts";
 
 export type Life = "alive" | "downed" | "waiting" | "departed";
 
@@ -57,7 +58,11 @@ export interface SimPlayer {
   odT: number;
   odBudget: number;
   moving: boolean;
-  stats: { damage: number; stagger: number; controlSeconds: number; objectiveSeconds: number; revives: number };
+  stats: { damage: number; stagger: number; controlSeconds: number; objectiveSeconds: number; revives: number; downs: number };
+  phoenixUsed: boolean;
+  phoenixT: number;
+  pulseT: number;
+  healBudget: number;
   participation: Map<number, SectionParticipation>;
   moveAccum: number;
   calmT: number;
@@ -246,7 +251,11 @@ export class Sim {
       odT: 0,
       odBudget: OVERDRIVE.maxGainPerSecond,
       moving: false,
-      stats: { damage: 0, stagger: 0, controlSeconds: 0, objectiveSeconds: 0, revives: 0 },
+      stats: { damage: 0, stagger: 0, controlSeconds: 0, objectiveSeconds: 0, revives: 0, downs: 0 },
+      phoenixUsed: false,
+      phoenixT: 0,
+      pulseT: SPECIAL_VALUES.pulse.every,
+      healBudget: 0,
       participation: new Map([[1, new SectionParticipation()]]),
       moveAccum: 0,
       calmT: 0,
@@ -254,8 +263,13 @@ export class Sim {
     const c = clampToWalkable(p.x, p.y, this.maxX);
     p.x = c.x;
     p.y = c.y;
+    if (this.has(p, "overcharge") && loadout.hasOverdrive) p.od = SPECIAL_VALUES.overcharge;
     this.players.set(id, p);
     return p;
+  }
+
+  private has(p: SimPlayer, special: string) {
+    return p.loadout.gear?.specials.includes(special as any) ?? false;
   }
 
   start() {
@@ -324,6 +338,7 @@ export class Sim {
       p.cds.dodge = PLAYER.dodgeCooldown;
       p.pending = null;
       p.lock = Math.max(p.lock, PLAYER.dodgeDuration * 0.8);
+      if (this.has(p, "dodgeShield")) this.giveShield(p, Math.round(p.maxHp * SPECIAL_VALUES.dodgeShield), 3);
       if (this.enemyNear(p.x, p.y, ACTIVITY.nearEnemyRange)) this.useful(p);
       return true;
     }
@@ -378,6 +393,17 @@ export class Sim {
   private tickPlayer(p: SimPlayer) {
     if (p.life === "departed" || p.life === "waiting") return;
     if (p.life === "downed") {
+      if (p.phoenixT > 0) {
+        p.phoenixT -= DT;
+        if (p.phoenixT <= 0) {
+          p.life = "alive";
+          p.hp = Math.round(p.maxHp * SPECIAL_VALUES.phoenix.hp);
+          p.reviveProgress = 0;
+          p.iframes = 1.5;
+          this.fx.push({ t: "revive", id: p.id, by: p.id });
+          return;
+        }
+      }
       p.downT -= DT;
       if (p.downT <= 0) {
         p.life = "waiting";
@@ -395,7 +421,18 @@ export class Sim {
     p.iframes = Math.max(0, p.iframes - DT);
     p.empowerT = Math.max(0, p.empowerT - DT);
     p.odT = Math.max(0, p.odT - DT);
-    p.odBudget = Math.min(OVERDRIVE.maxGainPerSecond, p.odBudget + OVERDRIVE.maxGainPerSecond * DT);
+    const odMax = OVERDRIVE.maxGainPerSecond * (1 + (L.gear?.stats.overdrive ?? 0));
+    p.odBudget = Math.min(odMax, p.odBudget + odMax * DT);
+    p.healBudget = Math.min(p.maxHp * 0.03, p.healBudget + p.maxHp * 0.03 * DT);
+    if (this.has(p, "pulse")) {
+      p.pulseT -= DT;
+      if (p.pulseT <= 0) {
+        p.pulseT = SPECIAL_VALUES.pulse.every;
+        for (const e of [...this.enemies.values()]) {
+          if (dist(p.x, p.y, e.x, e.y) <= SPECIAL_VALUES.pulse.radius + e.spec.radius) this.damageEnemy(p, e, L.damage * SPECIAL_VALUES.pulse.damage, 2, false, 0, p.x, p.y, "pulse");
+        }
+      }
+    }
     if (p.shieldT > 0) {
       p.shieldT -= DT;
       if (p.shieldT <= 0) p.shield = 0;
@@ -523,7 +560,7 @@ export class Sim {
 
   private gainOd(p: SimPlayer, amount: number) {
     if (!p.loadout.hasOverdrive || p.odT > 0) return;
-    const g = Math.min(amount, p.odBudget);
+    const g = Math.min(amount * (1 + (p.loadout.gear?.stats.overdrive ?? 0)), p.odBudget);
     p.odBudget -= g;
     p.od = Math.min(OVERDRIVE.max, p.od + g);
   }
@@ -730,11 +767,25 @@ export class Sim {
     if (e.state === "stagger") armor = 0;
     armor = Math.max(0, armor - e.status.armorBreak.value * 2);
     let taken = 1 + (e.state === "stagger" ? BOSS.staggerDamageTaken : 0) + e.status.armorBreak.value * 0.5;
+    const gear = p.loadout.gear;
+    let crit = false;
+    if (gear && gear.stats.crit > 0 && kind !== "zone" && this.rng() < gear.stats.crit) {
+      crit = true;
+      raw *= LOOT.critMultiplier;
+    }
+    if (this.has(p, "firstStrike") && e.hp > e.maxHp * 0.9) raw *= 1 + SPECIAL_VALUES.firstStrike;
     const dmg = Math.max(1, Math.round(raw * (1 - armor) * taken));
     e.hp = Math.max(0, e.hp - dmg);
     p.stats.damage += dmg;
     p.stats.stagger += stagger;
-    this.fx.push({ t: "hit", x: e.x, y: e.y, dmg, target: e.id, src: p.id, kind });
+    if (this.has(p, "lifesteal") && p.life === "alive" && p.healBudget > 0) {
+      const heal = Math.min(p.healBudget, dmg * SPECIAL_VALUES.lifesteal, p.maxHp - p.hp);
+      if (heal > 0) {
+        p.hp += heal;
+        p.healBudget -= heal;
+      }
+    }
+    this.fx.push({ t: "hit", x: e.x, y: e.y, dmg, target: e.id, src: p.id, kind, crit: crit || undefined });
     if (e.state === "channel") {
       e.channelDamage += dmg;
       if (e.channelDamage >= e.maxHp * SUPPORT.interruptDamageFraction || stagger >= 10) {
@@ -795,7 +846,7 @@ export class Sim {
     }
     this.fx.push({ t: "death", id: e.id, kind: e.kind, x: e.x, y: e.y });
     if (this.stage === "s2_defend") this.objective = Math.min(100, this.objective + 2.5);
-    if (e.kind === "boss") this.onBossDead();
+    if (e.kind === "boss") this.onBossDead(e);
   }
 
   // ---- damage to players -----------------------------------------------------
@@ -818,7 +869,16 @@ export class Sim {
       return false;
     }
     const od = p.odT > 0 ? p.loadout.spec.overdrive : null;
-    let dmg = Math.round(raw * (od ? od.damageTaken : 1));
+    let reduction = p.loadout.gear?.stats.armor ?? 0;
+    let guardian = 0;
+    for (const o of this.players.values()) {
+      if (o.life === "alive" && this.has(o, "guardian") && dist(o.x, o.y, p.x, p.y) <= SPECIAL_VALUES.guardian.radius) guardian = SPECIAL_VALUES.guardian.reduction;
+    }
+    reduction = Math.min(0.4, reduction + guardian);
+    if (src && this.has(p, "thorns") && src.hp > 0 && (srcKind === "" || srcKind === "sweep")) {
+      this.damageEnemy(p, src, raw * SPECIAL_VALUES.thorns, 0, false, 0, p.x, p.y, "thorns");
+    }
+    let dmg = Math.round(raw * (od ? od.damageTaken : 1) * (1 - reduction));
     if (p.shield > 0) {
       const a = Math.min(p.shield, dmg);
       p.shield -= a;
@@ -836,6 +896,11 @@ export class Sim {
       p.dash = null;
       p.brace = null;
       p.odT = 0;
+      p.stats.downs++;
+      if (this.has(p, "phoenix") && !p.phoenixUsed) {
+        p.phoenixUsed = true;
+        p.phoenixT = SPECIAL_VALUES.phoenix.delay;
+      }
       this.fx.push({ t: "down", id: p.id });
     }
     void src;
@@ -894,7 +959,7 @@ export class Sim {
     for (const p of this.players.values()) {
       if (p.life === "departed") continue;
       participants++;
-      if (p.life === "alive") alive++;
+      if (p.life === "alive" || (p.life === "downed" && p.phoenixT > 0)) alive++;
     }
     if (participants === 0 || alive === 0) {
       this.result = "failed";
@@ -1226,7 +1291,17 @@ export class Sim {
     for (const [id, h] of this.hazards) if (h.ownerId === e.id && h.kind === "strike" && h.delay > 0.3) this.hazards.delete(id);
   }
 
-  private onBossDead() {
+  /** Set when the boss dies: who was there and how much they contributed (for loot crates). */
+  bossKill: { x: number; y: number; players: { id: string; eligible: boolean; level: number; stats: SimPlayer["stats"] }[] } | null = null;
+
+  private onBossDead(boss: SimEnemy) {
+    this.bossKill = {
+      x: boss.x,
+      y: boss.y,
+      players: [...this.players.values()]
+        .filter((p) => p.life !== "departed")
+        .map((p) => ({ id: p.id, eligible: p.participation.get(3)?.eligibleSoFar() ?? false, level: p.loadout.level, stats: { ...p.stats } })),
+    };
     // The unstable biomass collapses with its core.
     for (const e of [...this.enemies.values()]) {
       this.enemies.delete(e.id);

@@ -3,7 +3,8 @@ import path from "node:path";
 import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { ROOM_NAME, isLineage, validateConfig } from "@ef/shared";
+import { randomUUID } from "node:crypto";
+import { ROOM_NAME, isLineage, rollBoxContents, validateConfig } from "@ef/shared";
 import { openDb, type Db } from "./db.ts";
 import { GameRoom } from "./GameRoom.ts";
 import { ActiveRuns } from "./locks.ts";
@@ -141,7 +142,40 @@ export async function startApp(opts: AppOptions): Promise<RunningApp> {
       return { profile: await profiles.equipModule(id, lineageOf(req.body?.lineage), m === null ? null : String(m ?? "")) };
     }),
   );
+  app.get(
+    "/api/inventory",
+    handle(async (_req, _res, id) => ({ items: await profiles.inventory(id), boxes: await profiles.listBoxes(id) })),
+  );
+  app.post(
+    "/api/boxes/open",
+    handle(async (req, _res, id) => ({ box: await profiles.openBox(id, String(req.body?.runId ?? "")) })),
+  );
+  app.post(
+    "/api/items/equip",
+    handle(async (req, _res, id) => {
+      labGuard(id);
+      const item = req.body?.itemId;
+      return { profile: await profiles.equipItem(id, lineageOf(req.body?.lineage), String(req.body?.slot ?? ""), item === null ? null : String(item ?? "")) };
+    }),
+  );
+  app.post(
+    "/api/items/dismantle",
+    handle(async (req, _res, id) => {
+      labGuard(id);
+      return profiles.dismantleItem(id, String(req.body?.itemId ?? ""));
+    }),
+  );
   if (opts.devTools) {
+    // Development only: grants a crate of a chosen tier to a profile so the reveal and arsenal can be inspected.
+    app.post(
+      "/api/dev/box",
+      handle(async (req, _res, id) => {
+        const tiers = ["bronze", "silver", "gold", "platinum", "divine", "ultra"];
+        const tier = tiers.includes(req.body?.tier) ? req.body.tier : "gold";
+        const contents = rollBoxContents(tier, Math.random, () => randomUUID());
+        return { box: await profiles.grantBox({ runId: `dev-${randomUUID()}`, profileId: id, tier, impact: 1, performance: 0.5, salvage: contents.salvage, items: contents.items }) };
+      }),
+    );
     // Development only: creates a NEW separate test profile at a chosen level.
     // It never edits an existing profile and is disabled unless DEV_TOOLS=1 outside production.
     app.post(

@@ -1,6 +1,8 @@
 import type { ResultsMsg } from "@ef/shared";
 import { t } from "../i18n.ts";
 import { esc } from "./dom.ts";
+import { crateBadgeHtml, revealBox } from "./loot.ts";
+import { api } from "../api.ts";
 import { brandHtml, icon, portraitHtml, UI_COPY, UI_LINEAGE_COLORS } from "./artwork.ts";
 
 export function renderResults(root: HTMLElement, res: ResultsMsg, myId: string, onBack: () => void, evolutions: ReadonlyMap<string, string> = new Map()) {
@@ -18,6 +20,7 @@ export function renderResults(root: HTMLElement, res: ResultsMsg, myId: string, 
         <div class="big">${t("results_xp", { xp: p.totalXp })}</div>${carry}
         <div class="result-level">${p.levelNow >= 20 && p.levelAtStart >= 20 ? t("level_cap_note") : t("results_level", { from: p.levelAtStart, to: p.levelNow })}</div>
         <ul>
+          ${p.box ? `<li class="result-box">${crateBadgeHtml(p.box.tier)} <small>${t("box_impact", { n: p.box.impact.toFixed(2) })}</small>${p.id === myId ? ` <button class="primary open-box">${t("box_open")}</button>` : ""}</li>` : p.id === myId && res.success ? `<li class="dim">${t("box_none")}</li>` : ""}
           ${pending}
           ${p.supportMark ? `<li class="support">${icon("support")}${t("results_support")}</li>` : ""}
           <li class="result-currencies"><span>${icon("salvage")}${p.totalSalvage}</span><span>${icon("crystal")}${p.totalFragments}</span></li>
@@ -38,4 +41,22 @@ export function renderResults(root: HTMLElement, res: ResultsMsg, myId: string, 
       <footer class="results-footer"><p class="small">${icon("check")}${t("results_saved")}</p><button class="primary back">${t("back_to_lab")}${icon("arrow")}</button></footer>
     </div>`;
   (root.querySelector(".back") as HTMLButtonElement).onclick = onBack;
+  const open = root.querySelector(".open-box") as HTMLButtonElement | null;
+  if (open) {
+    open.onclick = async () => {
+      open.disabled = true;
+      // The crate is persisted asynchronously at boss death; retry briefly if it is not there yet.
+      for (let i = 0; i < 6; i++) {
+        try {
+          const { box } = await api.openBox(res.runId);
+          await revealBox(box);
+          open.textContent = t("box_opened");
+          return;
+        } catch {
+          await new Promise((r) => setTimeout(r, 700));
+        }
+      }
+      open.disabled = false;
+    };
+  }
 }

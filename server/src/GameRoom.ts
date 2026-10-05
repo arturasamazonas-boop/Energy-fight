@@ -8,6 +8,9 @@ import {
   buildLoadout,
   carryMultiplier,
   isLineage,
+  impactScores,
+  rollBoxContents,
+  rollBoxTier,
   parseAction,
   parseInput,
   tierSpec,
@@ -16,6 +19,8 @@ import {
   type PlayerResult,
   type ResultsMsg,
   type SectionRewardView,
+  type BoxTier,
+  type LootMsg,
 } from "@ef/shared";
 import { ActiveRuns } from "./locks.ts";
 import type { ProfileService, ProfileView } from "./profiles.ts";
@@ -49,6 +54,7 @@ interface Seat {
   departedSection: number | null;
   eligibility: boolean[]; // per section index
   rewards: SectionRewardView[];
+  box: { tier: BoxTier; impact: number; performance: number } | null;
   inputBudget: number;
   actionBudget: number;
   rejected: number;
@@ -63,6 +69,7 @@ export class GameRoom extends Room {
   private rewardChain: Promise<unknown> = Promise.resolve();
   private results: ResultsMsg | null = null;
   private startedAt = 0;
+  private lootRolled = false;
   private speed = 1;
 
   get svc() {
@@ -129,6 +136,7 @@ export class GameRoom extends Room {
       departedSection: null,
       eligibility: [],
       rewards: [],
+      box: null,
       inputBudget: NET.maxInputsPerSecond,
       actionBudget: NET.maxActionsPerSecond,
       rejected: 0,
@@ -202,11 +210,15 @@ export class GameRoom extends Room {
     for (const seat of participants) {
       const profile = await this.svc.profiles.getProfile(seat.profileId);
       if (!profile) continue;
-      const loadout = buildLoadout(profile.lineages[seat.lineage]);
+      const loadout = buildLoadout(profile.lineages[seat.lineage], await this.svc.profiles.equippedItems(seat.profileId, seat.lineage));
       seat.levelAtStart = loadout.level;
       const p = this.state.players.get(seat.sessionId)!;
       this.applyLobbyLineage(p, profile, seat.lineage);
       sim.addPlayer(seat.sessionId, seat.profileId, profile.name, loadout);
+      p.maxHp = loadout.maxHp;
+      p.hp = loadout.maxHp;
+      p.auraRarity = loadout.gear.auraRarity;
+      p.weaponRarity = loadout.gear.weaponRarity;
       p.maxS1 = loadout.spec.skill1.cooldown;
       p.maxS2 = loadout.spec.skill2.cooldown;
       ActiveRuns.setRunning(seat.profileId, this.roomId, true);
@@ -320,6 +332,7 @@ export class GameRoom extends Room {
       for (const c of sim.drainClears()) this.queueSectionRewards(c.sectionId, c.eligibility);
     }
     if (fx.length) this.broadcast("fx", fx);
+    if (sim.bossKill && !this.lootRolled) this.grantLoot();
     this.syncState();
     if (sim.result !== "running") this.finish(sim.result === "success");
   }
@@ -359,6 +372,43 @@ export class GameRoom extends Room {
       });
     }
     this.rewardChain = this.rewardChain.then(() => Promise.all(tasks.map((t) => t()))).catch((e) => this.svc.log?.(`reward error ${e.message}`));
+  }
+
+  /** Boss is down: every eligible participant gets their own crate, tier by impact. */
+  private grantLoot() {
+    const sim = this.sim!;
+    const kill = sim.bossKill!;
+    this.lootRolled = true;
+    const scores = impactScores(
+      kill.players.map((k) => ({ id: k.id, level: k.level, ...k.stats })),
+      this.state.tier,
+    );
+    const rng = () => randomInt(0, 2 ** 32) / 2 ** 32;
+    const msg: LootMsg = { x: kill.x, y: kill.y, drops: [] };
+    const tasks: (() => Promise<void>)[] = [];
+    for (const k of kill.players) {
+      const seat = this.seats.get(k.id);
+      if (!seat || seat.departed || !k.eligible) continue;
+      const score = scores.get(k.id)!;
+      const tier = rollBoxTier(score.p, rng);
+      const contents = rollBoxContents(tier, rng, () => randomUUID());
+      seat.box = { tier, impact: score.relative, performance: score.p };
+      msg.drops.push({ id: k.id, name: sim.players.get(k.id)?.name ?? "", tier });
+      const grant = { runId: this.state.runId, profileId: seat.profileId, tier, impact: score.relative, performance: score.p, salvage: contents.salvage, items: contents.items };
+      tasks.push(async () => {
+        for (let i = 0; ; i++) {
+          try {
+            await this.svc.profiles.grantBox(grant);
+            return;
+          } catch (e: any) {
+            if (i >= 5) throw e;
+            await new Promise((r) => setTimeout(r, 200 * 2 ** i));
+          }
+        }
+      });
+    }
+    this.broadcast("loot", msg);
+    this.rewardChain = this.rewardChain.then(() => Promise.all(tasks.map((t) => t()))).catch((e) => this.svc.log?.(`loot error ${e.message}`));
   }
 
   private async awardWithRetry(award: Parameters<ProfileService["awardSection"]>[0]) {
@@ -408,9 +458,10 @@ export class GameRoom extends Room {
           controlSeconds: Math.round(sp.stats.controlSeconds),
           objectiveSeconds: Math.round(sp.stats.objectiveSeconds),
           departed: seat.departed,
+          box: seat.box,
         });
       }
-      this.results = { success, tier: this.state.tier, durationSec: Math.round((Date.now() - this.startedAt) / 1000), players };
+      this.results = { runId: this.state.runId, success, tier: this.state.tier, durationSec: Math.round((Date.now() - this.startedAt) / 1000), players };
       this.broadcast("results", this.results);
       await this.svc.profiles.recordRunEnd(this.state.runId, success ? "success" : "failed").catch(() => {});
     });

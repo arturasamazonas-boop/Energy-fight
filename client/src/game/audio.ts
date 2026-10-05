@@ -102,6 +102,14 @@ export function sfx(name: string) {
     case "pickup":
       tone(600, 0.12, "sine", 0.16, 300);
       break;
+    case "jackpot":
+      [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => tone(f, 0.28, "triangle", 0.2, 40), i * 110));
+      setTimeout(() => noise(0.5, 0.08, 6000), 500);
+      break;
+    case "crate_open":
+      noise(0.25, 0.15, 900);
+      tone(180, 0.3, "sawtooth", 0.12, 400);
+      break;
     case "ui":
       tone(700, 0.05, "sine", 0.08);
       break;

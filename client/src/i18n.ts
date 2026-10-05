@@ -129,6 +129,67 @@ const LT: Record<string, string> = {
   touch_help: "Telefone: kairė pusė – judėjimo vairalazdė, dešinė – mygtukai. Laikyk smūgio mygtuką kombinacijai.",
 };
 
+const LOOT_TEXT: Record<string, string> = {
+  box_bronze: "Bronzinė dėžė",
+  box_silver: "Sidabrinė dėžė",
+  box_gold: "Auksinė dėžė",
+  box_platinum: "PLATININĖ DĖŽĖ",
+  box_divine: "DIEVIŠKOJI DĖŽĖ",
+  box_ultra: "ULTRA MEGA DĖŽĖ",
+  box_wow: "WOW!!!",
+  box_yours: "Tavo dėžė",
+  box_open: "Atidaryti dėžę",
+  box_opened: "Atidaryta",
+  box_contents: "Dėžėje",
+  box_salvage: "+{n} laužo",
+  box_none: "Dėžės negavai – boso kovoje buvai neaktyvus.",
+  box_impact: "Įnašas ×{n}",
+  boxes: "Dėžės",
+  boxes_unopened: "Neatidarytos dėžės: {n}",
+  boxes_empty: "Dėžių dar nėra. Nugalėk bosą!",
+  great: "Puiku!",
+  arsenal: "Arsenalas",
+  arsenal_help: "Daiktai bendri visoms linijoms, bet vienas daiktas vienu metu dėvimas tik vienos linijos.",
+  arsenal_bonus: "Ekipuotės premijos",
+  slot_weapon: "Ginklas",
+  slot_shield: "Skydas",
+  slot_helmet: "Šalmas",
+  slot_armor: "Šarvai",
+  slot_aura: "Aura",
+  slot_relic: "Relikvija",
+  slot_empty: "Tuščia",
+  slot_pick: "Pasirink: {slot}",
+  slot_none_items: "Šiam lizdui daiktų dar neturi.",
+  item_equip: "Dėti",
+  item_unequip: "Nuimti",
+  item_equipped_on: "Dėvi: {lin}",
+  item_dismantle: "Išardyti (+{n})",
+  item_dismantle_confirm: "Išardyti „{name}“? Gausi {n} laužo. Daiktas dings.",
+  rarity_common: "Paprastas",
+  rarity_rare: "Retas",
+  rarity_epic: "Epinis",
+  rarity_legendary: "Legendinis",
+  rarity_mythic: "Mitinis",
+  rarity_ultra: "ULTRA",
+  stat_damage: "+{v}% žala",
+  stat_health: "+{v}% gyvybė",
+  stat_armor: "−{v}% gaunama žala",
+  stat_cooldown: "−{v}% įgūdžių atsistatymas",
+  stat_speed: "+{v}% greitis",
+  stat_crit: "+{v}% kritinis smūgis",
+  stat_overdrive: "+{v}% perkrovos kaupimas",
+  special_lifesteal: "Gyvybės siurbimas: 5% padarytos žalos grįžta kaip gyvybė",
+  special_thorns: "Spygliai: 30% artimos atakos žalos atsimuša į priešą",
+  special_pulse: "Rezonanso pulsas: kas 2 s žala aplink tave",
+  special_phoenix: "Feniksas: kartą per misiją pats atsikeli po 3 s",
+  special_dodgeShield: "Išsisukimo skydas: išsisukus gauni 8% skydą",
+  special_firstStrike: "Pirmas smūgis: +50% žala sveikiems priešams",
+  special_overcharge: "Perkrova: misiją pradedi su 50 perkrovos",
+  special_guardian: "Sargas: šalia esantys draugai gauna 10% mažiau žalos",
+  err_not_found: "Nerasta.",
+  err_invalid_choice: "Netinkamas pasirinkimas.",
+};
+
 const NAMES: Record<string, string> = {
   pyra: "PYRA",
   krios: "KRIOS",
@@ -179,7 +240,7 @@ const NAMES: Record<string, string> = {
 };
 
 export function t(key: string, vars: Record<string, string | number> = {}): string {
-  let s = LT[key] ?? NAMES[key] ?? key;
+  let s = LT[key] ?? LOOT_TEXT[key] ?? NAMES[key] ?? key;
   for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v));
   return s;
 }
@@ -187,6 +248,7 @@ export function t(key: string, vars: Record<string, string | number> = {}): stri
 export function errorText(code: string): string {
   const k = `err_${code}`;
   if (LT[k]) return LT[k];
+  if (LOOT_TEXT[k]) return LOOT_TEXT[k];
   if (/full|maxClients/i.test(code)) return LT.err_room_full;
   if (/not found|not_found|no rooms/i.test(code)) return LT.err_room_not_found;
   return t("err_generic", { code });

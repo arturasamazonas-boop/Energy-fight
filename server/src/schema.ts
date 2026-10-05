@@ -33,6 +33,8 @@ export class PlayerS extends Schema {
   @type("uint32") ack = 0;
   @type("float32") empower = 0;
   @type("uint8") tierUnlocked = 1;
+  @type("string") auraRarity = "";
+  @type("string") weaponRarity = "";
 }
 
 export class EnemyS extends Schema {

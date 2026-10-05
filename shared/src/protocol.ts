@@ -99,9 +99,23 @@ export interface PlayerResult {
   controlSeconds: number;
   objectiveSeconds: number;
   departed: boolean;
+  /** Loot crate earned for the boss kill (null if not eligible or the boss was not killed). */
+  box: { tier: string; impact: number; performance: number } | null;
+}
+
+export interface LootDrop {
+  id: string; // session id of the owner
+  name: string;
+  tier: string;
+}
+export interface LootMsg {
+  x: number;
+  y: number;
+  drops: LootDrop[];
 }
 
 export interface ResultsMsg {
+  runId: string;
   success: boolean;
   tier: number;
   durationSec: number;

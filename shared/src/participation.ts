@@ -58,6 +58,17 @@ export class SectionParticipation {
     if (able) this.denominator++;
   }
 
+  /** Eligibility including the still-open window, without closing it. */
+  eligibleSoFar(): boolean {
+    const copy = new SectionParticipation();
+    copy.active = this.active;
+    copy.denominator = this.denominator;
+    copy.windows = this.windows;
+    copy.cur = { ...this.cur };
+    copy.closeWindow();
+    return copy.eligible();
+  }
+
   eligible(): boolean {
     return this.active >= 1 && this.active * 2 >= this.denominator;
   }

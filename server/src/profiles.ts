@@ -15,6 +15,10 @@ import {
   type LineageId,
   type LineageRecord,
   type SectionRewardView,
+  LOOT,
+  SLOTS,
+  type BoxTier,
+  type ItemInstance,
 } from "@ef/shared";
 import type { Db, Queryer } from "./db.ts";
 
@@ -225,6 +229,159 @@ export class ProfileService {
     );
   }
 
+  // ---- loot crates & equipment ---------------------------------------------------
+
+  /** Idempotent crate grant keyed by (run, profile). Returns the stored crate. */
+  grantBox(a: { runId: string; profileId: string; tier: BoxTier; impact: number; performance: number; salvage: number; items: ItemInstance[] }): Promise<BoxView> {
+    return this.withLock(a.profileId, () =>
+      this.db.tx(async (q) => {
+        const inserted = await q.query(
+          `INSERT INTO loot_boxes (run_id, profile_id, tier, impact, performance, salvage, item_ids)
+           VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb) ON CONFLICT (run_id, profile_id) DO NOTHING RETURNING run_id`,
+          [a.runId, a.profileId, a.tier, a.impact, a.performance, a.salvage, JSON.stringify(a.items.map((i) => i.id))],
+        );
+        if (inserted.length) {
+          for (const it of a.items) {
+            await q.query(`INSERT INTO items (id, profile_id, base_id, slot, rarity, stats, special, source_run) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8)`, [
+              it.id, a.profileId, it.baseId, it.slot, it.rarity, JSON.stringify(it.stats), it.special, a.runId,
+            ]);
+          }
+          await q.query(`UPDATE profiles SET salvage = salvage + $2, updated_at = now() WHERE id = $1`, [a.profileId, a.salvage]);
+          await this.enforceInventoryLimit(q, a.profileId, new Set(a.items.map((i) => i.id)));
+        }
+        return (await this.boxView(q, a.profileId, a.runId))!;
+      }),
+    );
+  }
+
+  /** Over the limit, the weakest unequipped older items are salvaged automatically. */
+  private async enforceInventoryLimit(q: Queryer, profileId: string, keep: Set<string>) {
+    const rows = await q.query(`SELECT id, rarity FROM items WHERE profile_id = $1`, [profileId]);
+    const excess = rows.length - LOOT.inventoryLimit;
+    if (excess <= 0) return;
+    const worn = new Set<string>();
+    for (const r of await q.query(`SELECT equipment FROM lineage_progress WHERE profile_id = $1`, [profileId])) {
+      for (const id of Object.values(parseRanks(r.equipment) as unknown as Record<string, string>)) worn.add(id);
+    }
+    const order = ["common", "rare", "epic", "legendary", "mythic", "ultra"];
+    const victims = rows
+      .filter((r: any) => !worn.has(r.id) && !keep.has(r.id))
+      .sort((x: any, y: any) => order.indexOf(x.rarity) - order.indexOf(y.rarity))
+      .slice(0, excess);
+    let gain = 0;
+    for (const v of victims) {
+      await q.query(`DELETE FROM items WHERE id = $1`, [v.id]);
+      gain += LOOT.dismantleSalvage[v.rarity as keyof typeof LOOT.dismantleSalvage] ?? 0;
+    }
+    if (gain) await q.query(`UPDATE profiles SET salvage = salvage + $2 WHERE id = $1`, [profileId, gain]);
+  }
+
+  private async boxView(q: Queryer, profileId: string, runId: string): Promise<BoxView | null> {
+    const b = (await q.query(`SELECT * FROM loot_boxes WHERE run_id = $1 AND profile_id = $2`, [runId, profileId]))[0];
+    if (!b) return null;
+    const ids: string[] = typeof b.item_ids === "string" ? JSON.parse(b.item_ids) : b.item_ids;
+    const rows = ids.length ? await q.query(`SELECT * FROM items WHERE id = ANY($1)`, [ids]) : [];
+    const byId = new Map(rows.map((r: any) => [r.id, rowToItem(r)]));
+    return {
+      runId: b.run_id,
+      tier: b.tier,
+      salvage: Number(b.salvage),
+      impact: Number(b.impact),
+      performance: Number(b.performance),
+      opened: !!b.opened,
+      // Items dismantled later are simply omitted.
+      items: ids.map((id) => byId.get(id)).filter(Boolean) as ItemInstance[],
+      createdAt: new Date(b.created_at).toISOString(),
+    };
+  }
+
+  async listBoxes(profileId: string, limit = 20): Promise<BoxView[]> {
+    const rows = await this.db.query(`SELECT run_id FROM loot_boxes WHERE profile_id = $1 ORDER BY opened ASC, created_at DESC LIMIT $2`, [profileId, limit]);
+    const out: BoxView[] = [];
+    for (const r of rows) {
+      const v = await this.boxView(this.db, profileId, r.run_id);
+      if (v) out.push(v);
+    }
+    return out;
+  }
+
+  openBox(profileId: string, runId: string): Promise<BoxView> {
+    return this.withLock(profileId, () =>
+      this.db.tx(async (q) => {
+        const r = await q.query(`UPDATE loot_boxes SET opened = true WHERE run_id = $1 AND profile_id = $2 RETURNING run_id`, [runId, profileId]);
+        if (!r.length) throw new LabError("not_found");
+        return (await this.boxView(q, profileId, runId))!;
+      }),
+    );
+  }
+
+  async inventory(profileId: string): Promise<ItemInstance[]> {
+    const rows = await this.db.query(`SELECT * FROM items WHERE profile_id = $1 ORDER BY created_at DESC`, [profileId]);
+    return rows.map(rowToItem);
+  }
+
+  /** Items equipped on one lineage (used for the run-start loadout snapshot). */
+  async equippedItems(profileId: string, lineage: LineageId, q: Queryer = this.db): Promise<ItemInstance[]> {
+    const lp = (await q.query(`SELECT equipment FROM lineage_progress WHERE profile_id = $1 AND lineage = $2`, [profileId, lineage]))[0];
+    const eq = parseRanks(lp?.equipment) as unknown as Record<string, string>;
+    const ids = Object.values(eq).filter(Boolean);
+    if (!ids.length) return [];
+    const rows = await q.query(`SELECT * FROM items WHERE profile_id = $1 AND id = ANY($2)`, [profileId, ids]);
+    return rows.map(rowToItem);
+  }
+
+  /** Equips an item on one lineage; an item can be worn by only one lineage at a time. */
+  equipItem(profileId: string, lineage: LineageId, slot: string, itemId: string | null) {
+    return this.withLock(profileId, () =>
+      this.db.tx(async (q) => {
+        if (!(SLOTS as readonly string[]).includes(slot)) throw new LabError("invalid_choice");
+        if (itemId !== null) {
+          const it = (await q.query(`SELECT slot FROM items WHERE id = $1 AND profile_id = $2`, [itemId, profileId]))[0];
+          if (!it) throw new LabError("not_found");
+          if (it.slot !== slot) throw new LabError("invalid_choice");
+        }
+        const rows = await q.query(`SELECT lineage, equipment FROM lineage_progress WHERE profile_id = $1 FOR UPDATE`, [profileId]);
+        for (const r of rows) {
+          const eq = parseRanks(r.equipment) as unknown as Record<string, string>;
+          let changed = false;
+          for (const [s, id] of Object.entries(eq)) {
+            if (itemId !== null && id === itemId && !(r.lineage === lineage && s === slot)) {
+              delete eq[s];
+              changed = true;
+            }
+          }
+          if (r.lineage === lineage) {
+            if (itemId === null) delete eq[slot];
+            else eq[slot] = itemId;
+            changed = true;
+          }
+          if (changed) await q.query(`UPDATE lineage_progress SET equipment = $3::jsonb WHERE profile_id = $1 AND lineage = $2`, [profileId, r.lineage, JSON.stringify(eq)]);
+        }
+        return this.getProfile(profileId, q);
+      }),
+    );
+  }
+
+  /** Breaks an item down into salvage; it is unequipped everywhere first. */
+  dismantleItem(profileId: string, itemId: string) {
+    return this.withLock(profileId, () =>
+      this.db.tx(async (q) => {
+        const it = (await q.query(`DELETE FROM items WHERE id = $1 AND profile_id = $2 RETURNING rarity`, [itemId, profileId]))[0];
+        if (!it) throw new LabError("not_found");
+        const rows = await q.query(`SELECT lineage, equipment FROM lineage_progress WHERE profile_id = $1 FOR UPDATE`, [profileId]);
+        for (const r of rows) {
+          const eq = parseRanks(r.equipment) as unknown as Record<string, string>;
+          const before = JSON.stringify(eq);
+          for (const [s, id] of Object.entries(eq)) if (id === itemId) delete eq[s];
+          if (JSON.stringify(eq) !== before) await q.query(`UPDATE lineage_progress SET equipment = $3::jsonb WHERE profile_id = $1 AND lineage = $2`, [profileId, r.lineage, JSON.stringify(eq)]);
+        }
+        const gain = LOOT.dismantleSalvage[it.rarity as keyof typeof LOOT.dismantleSalvage] ?? 0;
+        await q.query(`UPDATE profiles SET salvage = salvage + $2, updated_at = now() WHERE id = $1`, [profileId, gain]);
+        return { profile: await this.getProfile(profileId, q), salvage: gain };
+      }),
+    );
+  }
+
   async recordRunStart(runId: string, code: string, tier: number, partySize: number) {
     await this.db.query(`INSERT INTO runs (run_id, room_code, tier, party_size) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [runId, code, tier, partySize]);
   }
@@ -260,7 +417,23 @@ function rowToRecord(r: any): LineageRecord {
     fragments: Number(r.fragments),
     moduleEquipped: r.module_equipped ?? null,
     moduleRanks: parseRanks(r.module_ranks),
+    equipment: parseRanks(r.equipment) as unknown as Record<string, string>,
   };
+}
+
+function rowToItem(r: any): ItemInstance {
+  return { id: r.id, baseId: r.base_id, slot: r.slot, rarity: r.rarity, stats: typeof r.stats === "string" ? JSON.parse(r.stats) : r.stats, special: r.special ?? null };
+}
+
+export interface BoxView {
+  runId: string;
+  tier: BoxTier;
+  salvage: number;
+  impact: number;
+  performance: number;
+  opened: boolean;
+  items: ItemInstance[];
+  createdAt: string;
 }
 
 function ledgerToView(r: any, bonus = false): SectionRewardView {

@@ -14,6 +14,7 @@ import { api, type ProfileView } from "../api.ts";
 import { t } from "../i18n.ts";
 import { esc, toast, confirmDialog } from "./dom.ts";
 import { brandHtml, icon, portraitHtml, UI_COPY, UI_LINEAGE_COLORS } from "./artwork.ts";
+import { renderArsenal, type ArsenalState } from "./loot.ts";
 
 export interface LabHandlers {
   onCreate: (lineage: LineageId) => void;
@@ -26,6 +27,14 @@ export interface LabHandlers {
 
 export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandlers, message?: string) {
   let selected: LineageId = profile.lastLineage;
+  let inv: ArsenalState = { items: [], boxes: [] };
+  const loadInventory = async () => {
+    try {
+      inv = await api.inventory();
+    } catch {}
+    drawList();
+    drawDetail();
+  };
   root.innerHTML = `
     <div class="screen lab illustrated-screen">
       <header class="lab-head">
@@ -54,7 +63,7 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
         <div class="lineage-detail"></div>
       </div>
 
-      ${h.devTools ? `<details class="dev"><summary>${t("dev_tools")}</summary>${[1, 9, 18].map((l) => `<button class="ghost dev-seed" data-l="${l}">${t("dev_seed", { level: l })}</button>`).join("")}</details>` : ""}
+      ${h.devTools ? `<details class="dev"><summary>${t("dev_tools")}</summary>${[1, 9, 18].map((l) => `<button class="ghost dev-seed" data-l="${l}">${t("dev_seed", { level: l })}</button>`).join("")}${["gold", "platinum", "divine", "ultra"].map((x) => `<button class="ghost dev-box" data-t="${x}">+ ${t("box_" + x)}</button>`).join("")}</details>` : ""}
       <p class="fine">${t("guest_note")}</p>
     </div>`;
 
@@ -87,7 +96,8 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
 
   const drawDetail = () => {
     const rec = profile.lineages[selected];
-    const L = buildLoadout(rec);
+    const byId = new Map(inv.items.map((i) => [i.id, i]));
+    const L = buildLoadout(rec, Object.values(rec.equipment ?? {}).map((id) => byId.get(id!)).filter(Boolean) as any);
     const spec = LINEAGE_SPECS[selected];
     const atCap = rec.level >= PLAYER.levelCap;
     const need = xpToNext(rec.level);
@@ -117,6 +127,7 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
         </div>
       </article>
       <div class="character-loadout">
+        <section class="arsenal"></section>
         <section class="ability-section"><h3>${UI_COPY.abilities}</h3>
           <div class="skills">
             <div class="skill"><b>${icon("sword")}</b><span><small>01</small>${t(spec.skill1.id)}</span></div>
@@ -128,6 +139,11 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
         <section class="mod"></section>
         <section class="modules"></section>
       </div>`;
+
+    renderArsenal(detail.querySelector(".arsenal") as HTMLElement, profile, selected, inv, (p) => {
+      if (p) update(p);
+      loadInventory();
+    });
 
     // Evolution (level 10): before/after silhouettes + precise mechanical change.
     const evo = detail.querySelector(".evo") as HTMLElement;
@@ -248,6 +264,7 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
 
   drawList();
   drawDetail();
+  loadInventory();
   root.querySelector<HTMLButtonElement>(".create-btn")!.onclick = () => h.onCreate(selected);
   const input = root.querySelector<HTMLInputElement>(".code-input")!;
   input.oninput = () => (input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, ""));
@@ -259,5 +276,16 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
     if (e.key === "Enter") join();
   };
   root.querySelector<HTMLButtonElement>(".settings-btn")!.onclick = h.onSettings;
+  root.querySelectorAll<HTMLButtonElement>(".dev-box").forEach(
+    (b) =>
+      (b.onclick = async () => {
+        try {
+          await api.devBox(b.dataset.t!);
+          loadInventory();
+        } catch (e: any) {
+          toast(e.code);
+        }
+      }),
+  );
   root.querySelectorAll<HTMLButtonElement>(".dev-seed").forEach((b) => (b.onclick = () => h.onDevSeed(Number(b.dataset.l))));
 }

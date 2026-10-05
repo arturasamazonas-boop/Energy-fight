@@ -1,4 +1,15 @@
-import type { LineageId, LineageRecord } from "@ef/shared";
+import type { BoxTier, ItemInstance, LineageId, LineageRecord } from "@ef/shared";
+
+export interface BoxView {
+  runId: string;
+  tier: BoxTier;
+  salvage: number;
+  impact: number;
+  performance: number;
+  opened: boolean;
+  items: ItemInstance[];
+  createdAt: string;
+}
 
 export interface ProfileView {
   id: string;
@@ -80,5 +91,10 @@ export const api = {
   modifier: (lineage: LineageId, modifier: string) => call<{ profile: ProfileView }>("POST", "/api/lab/modifier", { lineage, modifier }),
   upgradeModule: (lineage: LineageId, module: string) => call<{ profile: ProfileView }>("POST", "/api/lab/module/upgrade", { lineage, module }),
   equipModule: (lineage: LineageId, module: string | null) => call<{ profile: ProfileView }>("POST", "/api/lab/module/equip", { lineage, module }),
+  inventory: () => call<{ items: ItemInstance[]; boxes: BoxView[] }>("GET", "/api/inventory"),
+  openBox: (runId: string) => call<{ box: BoxView }>("POST", "/api/boxes/open", { runId }),
+  equipItem: (lineage: LineageId, slot: string, itemId: string | null) => call<{ profile: ProfileView }>("POST", "/api/items/equip", { lineage, slot, itemId }),
+  dismantle: (itemId: string) => call<{ profile: ProfileView; salvage: number }>("POST", "/api/items/dismantle", { itemId }),
+  devBox: (tier: string) => call<{ box: BoxView }>("POST", "/api/dev/box", { tier }),
   devSeed: (level: number) => call<{ token: string; profile: ProfileView }>("POST", "/api/dev/seed", { level }),
 };

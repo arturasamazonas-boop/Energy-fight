@@ -19,6 +19,9 @@ import { ILLUSTRATED_ASSETS, ENEMY_DISPLAY_HEIGHT, artworkMetrics, artworkUrl, c
 import { sfx } from "./audio.ts";
 import type { Controls } from "./controls.ts";
 import type { Hud } from "./hud.ts";
+import { LootDrops } from "./lootDrops.ts";
+import { TIER_RANK } from "./crate.ts";
+import { RARITY_COLORS, type BoxTier, type LootMsg, type Rarity } from "@ef/shared";
 
 const DS = WORLD.depthScale;
 const sx = (x: number) => x;
@@ -155,10 +158,25 @@ export class BattleScene extends Phaser.Scene {
     this.controls.onAction = (a) => this.sendAction(a);
     this.offFns.push(this.room.onMessage("fx", (list: FxEvent[]) => list.forEach((f) => this.onFx(f))) as any);
     this.offFns.push(this.room.onMessage("deny", () => {}) as any);
+    this.loot = new LootDrops(this, this.room.sessionId);
+    this.offFns.push(this.room.onMessage("loot", (m: LootMsg) => this.onLoot(m)) as any);
     this.events.once("shutdown", () => this.cleanup());
   }
 
+  private loot!: LootDrops;
+
+  private onLoot(m: LootMsg) {
+    this.loot.spawn(m);
+    const mine = m.drops.find((d) => d.id === this.room.sessionId);
+    if (!mine) return;
+    const rank = TIER_RANK[mine.tier as BoxTier] ?? 0;
+    this.hud.banner(rank >= 3 ? `${t("box_wow")} ${t("box_" + mine.tier)}!` : `${t("box_yours")}: ${t("box_" + mine.tier)}`, rank >= 3 ? 4200 : 2800);
+    sfx(rank >= 3 ? "jackpot" : "section");
+    if (rank >= 4 && !settings.reducedMotion) this.cameras.main.flash(400, 255, 240, 200);
+  }
+
   private cleanup() {
+    this.loot?.destroy();
     for (const f of this.offFns) if (typeof f === "function") f();
     this.offFns = [];
   }
@@ -409,6 +427,7 @@ export class BattleScene extends Phaser.Scene {
     this.drawOverlay(st);
     this.drawGates(st);
     this.updateTransients(dt);
+    this.loot.update(dt);
     this.updateCamera(me, dt);
     this.drawMarkers(st, me);
     this.drawGroundEffects(st, now);
@@ -744,6 +763,18 @@ export class BattleScene extends Phaser.Scene {
         g.lineStyle(2, 0xbfe6ff, 0.7);
         g.strokeEllipse(x, y - v.height * .48, v.height * .92, v.height * 1.12);
       }
+      if (p.auraRarity && p.life === "alive" && !settings.reducedEffects) {
+        // Equipped aura: a slowly turning ring in the item's rarity colour.
+        const col = Phaser.Display.Color.HexStringToColor(RARITY_COLORS[p.auraRarity as Rarity] ?? "#ffffff").color;
+        const tt = performance.now() / 900;
+        g.lineStyle(2, col, 0.55);
+        for (let k = 0; k < 6; k++) {
+          const a0 = tt + (k * Math.PI) / 3;
+          g.beginPath();
+          g.arc(x, y, 34, a0, a0 + 0.6, false);
+          g.strokePath();
+        }
+      }
       if (p.odT > 0) {
         g.lineStyle(3, LINEAGE_COLORS[p.lineage as LineageId]?.glowHex ?? 0xffffff, 0.5 + 0.3 * Math.sin(performance.now() / 80));
         g.strokeEllipse(x, y, 70, 70 * DS);
@@ -946,12 +977,12 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  private damageNumber(x: number, y: number, value: number, color: string) {
+  private damageNumber(x: number, y: number, value: number, color: string, crit = false) {
     if (this.numbers.length >= (settings.reducedEffects ? 12 : 56)) return;
     let txt = this.numberPool.pop();
     if (!txt) txt = this.add.text(0, 0, "", { fontFamily: "system-ui, sans-serif", fontSize: "16px", fontStyle: "bold", stroke: "#000", strokeThickness: 3 }).setOrigin(0.5);
-    txt.setText(String(value)).setColor(color).setPosition(sx(x) + (Math.random() - 0.5) * 16, sy(y) - 60).setVisible(true).setAlpha(1).setDepth(150000);
-    this.numbers.push({ txt, life: 0.7, vy: 50 });
+    txt.setText(crit ? `${value}!` : String(value)).setColor(crit ? "#ffd34a" : color).setFontSize(crit ? 22 : 16).setPosition(sx(x) + (Math.random() - 0.5) * 16, sy(y) - 60).setVisible(true).setAlpha(1).setDepth(150000);
+    this.numbers.push({ txt, life: crit ? 0.9 : 0.7, vy: crit ? 70 : 50 });
   }
 
   private swingFx(x: number, y: number, ang: number, range: number, arcDeg: number, lineage: string, step: number, elevation = 28) {
@@ -1006,7 +1037,7 @@ export class BattleScene extends Phaser.Scene {
         const v = this.enemies.get(f.target);
         if (v) v.flash = 1;
         const mine = f.src === myId;
-        this.damageNumber(f.x, f.y, f.dmg, mine ? "#ffffff" : "#b9c4d0");
+        this.damageNumber(f.x, f.y, f.dmg, mine ? "#ffffff" : "#b9c4d0", !!f.crit);
         if (mine) {
           sfx("hit");
           this.hitStop = 0.05;

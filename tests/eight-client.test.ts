@@ -78,12 +78,22 @@ test("eight simulated clients complete a mission; per-profile rewards match the 
     const prof = await app.profiles.getProfile(profiles[i].profile.id);
     const rec = prof!.lineages[lineages[i] as "pyra"];
     assert.deepEqual([r.levelNow, r.xpNow], [rec.level, rec.xp], `Bot${i} level matches database`);
-    assert.equal(prof!.salvage, salvageSum, `Bot${i} salvage balance`);
+    const crate: any[] = await app.db.query("SELECT salvage FROM loot_boxes WHERE run_id = $1 AND profile_id = $2", [runId, profiles[i].profile.id]);
+    const crateSalvage = crate.reduce((acc: number, c: any) => acc + Number(c.salvage), 0);
+    assert.equal(prof!.salvage, salvageSum + crateSalvage, `Bot${i} salvage balance (sections + crate)`);
     // Each eligible section paid exactly the carry formula for this profile.
     const parts = sectionXp(fullClearXp(1, levels[i]));
     for (const row of ledger) assert.equal(Number(row.xp), row.eligible ? parts[row.section_id - 1] : 0);
   }
+  // Boss crates: each crate shown in results is persisted once, with the same tier; AFK gets none.
+  for (let i = 0; i < 8; i++) {
+    const r = results.players.find((p: any) => p.name === `Bot${i}`);
+    const rows: any[] = await app.db.query("SELECT tier FROM loot_boxes WHERE run_id = $1 AND profile_id = $2", [runId, profiles[i].profile.id]);
+    if (r.box) assert.deepEqual(rows.map((x) => x.tier), [r.box.tier], `crate for Bot${i}`);
+    else assert.equal(rows.length, 0);
+  }
   const afk = results.players.find((p: any) => p.name === "Bot7");
+  assert.equal(afk.box, null, "AFK participant gets no crate");
   assert.equal(afk.totalXp, 0, "AFK participant earns nothing");
   const novice = results.players.find((p: any) => p.name === "Bot1");
   const helper = results.players.find((p: any) => p.name === "Bot0");
