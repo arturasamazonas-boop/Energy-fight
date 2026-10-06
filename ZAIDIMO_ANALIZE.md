@@ -28,7 +28,7 @@
 
 ## Didžiausios likusios spragos (pagal svarbą)
 
-1. **Animacijų piešiniai.** Grojimas jau paruoštas, trūksta pačių ChatGPT kadrų juostų. Tai didžiausias žingsnis iki „nerealiai gražu“.
+1. **Animacijų piešiniai.** Pyra (visos 3 formos, po 12 animacijų) jau animuota tikrais kadrais. Liko Krios, Vektor, Litos, priešai ir Valdovas.
 2. **Misijos tempas.** Pailginta, bet reikia gyvo žaidimo testo, ar tempas jaučiasi gerai.
 3. **Turinys.** Pridėtas antras bosas **Kristalų Valdovas** (misija „Kristalų šerdis“): piliarų skydas, besisukantys lazeriai, šukių novos ir teleportacija. Liko: atskiras žemėlapis antram bosui, dienos iššūkis su garantuota bent auksine dėže, tikri Valdovo piešiniai.
 4. **Garsas.** Garsai kol kas sintetiniai. Reikia tikrų smūgių, dėžių atidarymo garsų ir muzikos.
