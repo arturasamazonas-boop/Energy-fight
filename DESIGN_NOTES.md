@@ -101,3 +101,14 @@ A window counts as able-to-act if the body was alive for at least half of it. A 
 - **Shard nova:** a ring of 10 crystal shards (phase 2: two rings of 14, offset). **Blink** (phase 2) teleports at least 260 units away from every player and fires a small nova on arrival.
 - The Warden is immune to pulls and knockback, and its slow is capped at 20%, like the first boss.
 - Bot runs: a 4-player tier-1 party and a level-11 tier-2 party clear it, with a boss fight of about 1.5–2 min when pylons are focused first. Solo bots at level 7 usually win. Bots cannot dodge the beam, so humans should do better.
+
+## Daily challenge
+
+- Opt-in: the lobby leader toggles it (`daily` message, leader only, lobby phase only).
+- One rule per UTC day, rotating `elites` → `frenzy` → `glass` (`dailyMutator()` in shared config). The rule and the day key are fixed when the run starts.
+- Reward: each player's first boss kill of the day lifts their box to at least gold and adds +40 salvage. `daily_claims (profile_id, day)` is the single source of truth. A claim is idempotent per run, so a retried grant never double-pays and a second run the same day gets the normal box.
+- `PlayerS.dailyDone` shows in the lobby who can still claim today (☀ chip).
+
+## Automatic quality
+
+`client/src/game/perf.ts`: after a 4 s warm-up, a smoothed FPS below 40 for 5 s steps quality down once per level. The first step reduces effects, the second drops render resolution to 1×. It never steps back up within a session.

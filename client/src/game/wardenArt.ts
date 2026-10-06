@@ -119,3 +119,93 @@ export function pylonCanvas() {
   ctx.fill();
   return c;
 }
+
+/**
+ * Crystal-core makeover for the boss arena (Warden mission). Drawn in screen
+ * space for the arena rectangle: violet-cyan floor glaze, glowing fissures and
+ * crystal clusters growing from the back wall. `ds` is the depth scale.
+ */
+export function crystalArenaCanvas(w: number, h: number, ds: number) {
+  const wall = 150; // room above the floor for crystals on the back wall
+  const c = canvasOf(w, Math.ceil(h * ds) + wall);
+  const ctx = c.getContext("2d")!;
+  const fy = wall; // floor top in canvas space
+  const fh = h * ds;
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+
+  // Darker cave tone first, so the chamber reads as a different place.
+  ctx.fillStyle = "rgba(30,22,70,.38)";
+  ctx.fillRect(0, fy, w, fh);
+  // Floor glaze, fading toward the edges.
+  const glaze = ctx.createRadialGradient(w / 2, fy + fh / 2, 20, w / 2, fy + fh / 2, w * 0.6);
+  glaze.addColorStop(0, "rgba(140,110,255,.30)");
+  glaze.addColorStop(0.55, "rgba(90,200,255,.16)");
+  glaze.addColorStop(1, "rgba(40,80,140,.05)");
+  ctx.fillStyle = glaze;
+  ctx.fillRect(0, fy, w, fh);
+
+  // Faint violet fissures. Kept short, jagged and dim so they never read like the
+  // Warden's cyan beam telegraphs.
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 16) * Math.PI * 2 + rnd() * 0.3;
+    let x = w / 2 + Math.cos(a) * 60, y = fy + fh / 2 + Math.sin(a) * 60 * ds;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    const steps = 3 + Math.floor(rnd() * 3);
+    for (let s = 0; s < steps; s++) {
+      const len = 22 + rnd() * 30;
+      const da = a + (rnd() - 0.5) * 1.6;
+      x += Math.cos(da) * len;
+      y += Math.sin(da) * len * ds;
+      ctx.lineTo(x, y);
+    }
+    ctx.shadowColor = "#b48cff";
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = "rgba(190,150,255,.32)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // Rune ring around the heart.
+  ctx.save();
+  ctx.translate(w / 2, fy + fh / 2);
+  ctx.scale(1, ds);
+  ctx.strokeStyle = "rgba(201,168,255,.45)";
+  ctx.lineWidth = 3;
+  ctx.shadowColor = "#b48cff";
+  ctx.shadowBlur = 14;
+  for (const r of [150, 172]) {
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 150, Math.sin(a) * 150);
+    ctx.lineTo(Math.cos(a + 0.12) * 172, Math.sin(a + 0.12) * 172);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Crystal clusters along the back wall (outside the walkable floor).
+  for (let x = 40; x < w - 30; x += 70 + rnd() * 60) {
+    const n = 2 + Math.floor(rnd() * 3);
+    for (let k = 0; k < n; k++) {
+      const hh = 40 + rnd() * 90;
+      shard(ctx, x + (k - n / 2) * 16, fy + 4, 16 + rnd() * 14, hh, (rnd() - 0.5) * 0.7, "#b8f7ff", "#2f6f96", rnd() < 0.3 ? "#c9a8ff" : "#7de8ff");
+    }
+  }
+  // A few small shards scattered on the floor edges.
+  for (let i = 0; i < 14; i++) {
+    const side = rnd() < 0.5;
+    const x = side ? 20 + rnd() * 90 : w - 20 - rnd() * 90;
+    const y = fy + 30 + rnd() * (fh - 40);
+    shard(ctx, x, y, 8 + rnd() * 8, 14 + rnd() * 22, (rnd() - 0.5) * 0.8, "#c6f8ff", "#3a7ea0", "#8ef0ff");
+  }
+  return { canvas: c, wall };
+}

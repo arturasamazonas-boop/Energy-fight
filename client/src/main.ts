@@ -218,7 +218,7 @@ function startGame() {
   const holder = document.createElement("div");
   holder.className = "canvas-holder";
   stage.prepend(holder);
-  const dpr = Math.min(settings.reducedEffects ? 1 : 2, window.devicePixelRatio || 1);
+  let dpr = Math.min(settings.reducedEffects ? 1 : 2, window.devicePixelRatio || 1);
   const w = window.innerWidth;
   const h = window.innerHeight;
   game = new Phaser.Game({
@@ -241,6 +241,13 @@ function startGame() {
     game.scale.setZoom(1 / dpr);
     (game.scene.getScene("battle") as BattleScene | null)?.resize();
   };
+  // Automatic quality: a slow phone first loses extra effects, then renders at 1×.
+  game.events.on("quality-lowered", (step: string) => {
+    if (step !== "resolution" || dpr <= 1) return;
+    dpr = 1;
+    game?.registry.set("dpr", dpr);
+    onResize();
+  });
   window.addEventListener("resize", onResize);
   window.addEventListener("orientationchange", onResize);
   (game as any).__onResize = onResize;

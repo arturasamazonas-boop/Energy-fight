@@ -36,6 +36,7 @@ export class PlayerS extends Schema {
   @type("string") auraRarity = "";
   @type("string") weaponRarity = "";
   @type("uint16") gear = 0;
+  @type("boolean") dailyDone = false; // already claimed today's daily-challenge box
 }
 
 export class EnemyS extends Schema {
@@ -85,6 +86,8 @@ export class GameState extends Schema {
   @type("string") leaderId = "";
   @type("uint8") tier = 1;
   @type("string") mission = "brood";
+  @type("boolean") daily = false;
+  @type("string") dailyMutator = "";
   @type("string") runId = "";
   @type("string") stage = "";
   @type("uint8") section = 1;

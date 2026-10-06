@@ -9,6 +9,10 @@ import {
   carryMultiplier,
   isLineage,
   BOSS_VARIANTS,
+  BOX_TIERS,
+  DAILY,
+  dailyKey,
+  dailyMutator,
   gearScore,
   impactScores,
   rollBoxContents,
@@ -56,7 +60,7 @@ interface Seat {
   departedSection: number | null;
   eligibility: boolean[]; // per section index
   rewards: SectionRewardView[];
-  box: { tier: BoxTier; impact: number; performance: number } | null;
+  box: { tier: BoxTier; impact: number; performance: number; daily?: boolean } | null;
   inputBudget: number;
   actionBudget: number;
   rejected: number;
@@ -72,6 +76,8 @@ export class GameRoom extends Room {
   private results: ResultsMsg | null = null;
   private startedAt = 0;
   private lootRolled = false;
+  /** UTC day of the running daily challenge ("" when the run is not a daily). */
+  private dailyDay = "";
   private speed = 1;
 
   get svc() {
@@ -83,6 +89,7 @@ export class GameRoom extends Room {
     activeCodes.add(code);
     this.roomId = code;
     this.state.code = code;
+    this.state.dailyMutator = dailyMutator();
     if (this.svc.allowTestSpeed && Number.isInteger(options?.testSpeed)) this.speed = Math.max(1, Math.min(10, options.testSpeed));
     this.setPrivate(true);
     this.setPatchRate(NET.patchMs);
@@ -95,6 +102,11 @@ export class GameRoom extends Room {
     this.onMessage("mission", (client, m: any) => {
       if (this.state.phase !== "lobby" || client.sessionId !== this.state.leaderId) return;
       if ((BOSS_VARIANTS as readonly string[]).includes(m?.mission)) this.state.mission = m.mission;
+    });
+    this.onMessage("daily", (client, m: any) => {
+      if (this.state.phase !== "lobby" || client.sessionId !== this.state.leaderId) return;
+      this.state.daily = m?.on === true;
+      this.state.dailyMutator = dailyMutator();
     });
     this.onMessage("start", (client) => this.onStart(client).catch((e) => this.fail(client, e)));
     this.onMessage("input", (client, m) => this.onInput(client, m));
@@ -133,6 +145,7 @@ export class GameRoom extends Room {
     p.tierUnlocked = profile.tierUnlocked;
     this.applyLobbyLineage(p, profile, lineage);
     this.refreshGear(profileId, lineage, p);
+    this.svc.profiles.dailyClaimed(profileId, dailyKey()).then((done) => (p.dailyDone = done)).catch(() => {});
     this.state.players.set(client.sessionId, p);
     this.seats.set(client.sessionId, {
       sessionId: client.sessionId,
@@ -223,7 +236,10 @@ export class GameRoom extends Room {
     // Snapshot every participant's loadout from the database at run start.
     const runId = randomUUID();
     const participants = [...this.seats.values()].filter((s) => this.state.players.get(s.sessionId)?.connected);
-    const sim = new Sim({ runId, tier: this.state.tier, partySize: participants.length, boss: this.state.mission as any });
+    const now = Date.now();
+    this.dailyDay = this.state.daily ? dailyKey(now) : "";
+    this.state.dailyMutator = dailyMutator(now);
+    const sim = new Sim({ runId, tier: this.state.tier, partySize: participants.length, boss: this.state.mission as any, mutator: this.state.daily ? this.state.dailyMutator as any : undefined });
     for (const seat of participants) {
       const profile = await this.svc.profiles.getProfile(seat.profileId);
       if (!profile) continue;
@@ -349,7 +365,10 @@ export class GameRoom extends Room {
       for (const c of sim.drainClears()) this.queueSectionRewards(c.sectionId, c.eligibility);
     }
     if (fx.length) this.broadcast("fx", fx);
-    if (sim.bossKill && !this.lootRolled) this.grantLoot();
+    if (sim.bossKill && !this.lootRolled) {
+      this.lootRolled = true;
+      this.grantLoot().catch((e) => this.svc.log?.(`loot error ${e.message}`));
+    }
     this.syncState();
     if (sim.result !== "running") this.finish(sim.result === "success");
   }
@@ -392,10 +411,10 @@ export class GameRoom extends Room {
   }
 
   /** Boss is down: every eligible participant gets their own crate, tier by impact. */
-  private grantLoot() {
+  private async grantLoot() {
     const sim = this.sim!;
     const kill = sim.bossKill!;
-    this.lootRolled = true;
+    const runId = this.state.runId;
     const scores = impactScores(
       kill.players.map((k) => ({ id: k.id, level: k.level, ...k.stats })),
       this.state.tier,
@@ -407,11 +426,18 @@ export class GameRoom extends Room {
       const seat = this.seats.get(k.id);
       if (!seat || seat.departed || !k.eligible) continue;
       const score = scores.get(k.id)!;
-      const tier = rollBoxTier(score.p, rng);
+      let tier = rollBoxTier(score.p, rng);
+      // Daily challenge: the first boss kill of the day lifts the box to at least gold.
+      let daily = false;
+      if (this.dailyDay) {
+        daily = await this.svc.profiles.claimDaily(seat.profileId, this.dailyDay, runId).catch(() => false);
+        if (daily && BOX_TIERS.indexOf(tier) < BOX_TIERS.indexOf(DAILY.minBox)) tier = DAILY.minBox;
+      }
       const contents = rollBoxContents(tier, rng, () => randomUUID());
-      seat.box = { tier, impact: score.relative, performance: score.p };
-      msg.drops.push({ id: k.id, name: sim.players.get(k.id)?.name ?? "", tier });
-      const grant = { runId: this.state.runId, profileId: seat.profileId, tier, impact: score.relative, performance: score.p, salvage: contents.salvage, items: contents.items };
+      const salvage = contents.salvage + (daily ? DAILY.bonusSalvage : 0);
+      seat.box = { tier, impact: score.relative, performance: score.p, daily };
+      msg.drops.push({ id: k.id, name: sim.players.get(k.id)?.name ?? "", tier, daily });
+      const grant = { runId, profileId: seat.profileId, tier, impact: score.relative, performance: score.p, salvage, items: contents.items };
       tasks.push(async () => {
         for (let i = 0; ; i++) {
           try {

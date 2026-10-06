@@ -21,7 +21,8 @@ import type { Controls } from "./controls.ts";
 import type { Hud } from "./hud.ts";
 import { LootDrops } from "./lootDrops.ts";
 import { Tips } from "./tips.ts";
-import { pylonCanvas, wardenCanvas } from "./wardenArt.ts";
+import { PerfWatch } from "./perf.ts";
+import { crystalArenaCanvas, pylonCanvas, wardenCanvas } from "./wardenArt.ts";
 import { AnimLibrary, stripScale } from "./animations.ts";
 import { TIER_RANK } from "./crate.ts";
 import { RARITY_COLORS, type BoxTier, type LootMsg, type Rarity } from "@ef/shared";
@@ -168,14 +169,31 @@ export class BattleScene extends Phaser.Scene {
     if (!this.textures.exists("enemy.warden")) this.textures.addCanvas("enemy.warden", wardenCanvas());
     if (!this.textures.exists("enemy.pylon")) this.textures.addCanvas("enemy.pylon", pylonCanvas());
     (window as any).__efScene = this;
+    (window as any).__efPerf = this.perf.stats;
     this.loot = new LootDrops(this, this.room.sessionId);
     this.tips = new Tips(this.hud.root, (this.room.state as any).players?.get(this.room.sessionId)?.level ?? 1);
     this.tips.show("move");
+    {
+      const st = this.room.state as any;
+      if (st.daily && st.dailyMutator) this.time.delayedCall(900, () => this.hud.banner(`☀ ${t("daily_title")}: ${t("mut_" + st.dailyMutator)}`, 3600));
+    }
     this.offFns.push(this.room.onMessage("loot", (m: LootMsg) => this.onLoot(m)) as any);
     this.events.once("shutdown", () => this.cleanup());
   }
 
   private loot!: LootDrops;
+  private perf = new PerfWatch(
+    [...(settings.reducedEffects ? [] : ["effects" as const]), "resolution" as const],
+    (step) => {
+      if (step === "resolution" && (this.game.registry.get("dpr") ?? 1) <= 1) return;
+      if (step === "effects") {
+        settings.reducedEffects = true;
+        document.body.classList.add("reduce-effects");
+      }
+      this.game.events.emit("quality-lowered", step);
+      this.hud.banner(t("perf_lowered"), 2600);
+    },
+  );
   private animLib = new AnimLibrary();
   private tips!: Tips;
   private tipClock = 0;
@@ -210,7 +228,8 @@ export class BattleScene extends Phaser.Scene {
     const mine = m.drops.find((d) => d.id === this.room.sessionId);
     if (!mine) return;
     const rank = TIER_RANK[mine.tier as BoxTier] ?? 0;
-    this.hud.banner(rank >= 3 ? `${t("box_wow")} ${t("box_" + mine.tier)}!` : `${t("box_yours")}: ${t("box_" + mine.tier)}`, rank >= 3 ? 4200 : 2800);
+    const head = rank >= 3 ? `${t("box_wow")} ${t("box_" + mine.tier)}!` : `${t("box_yours")}: ${t("box_" + mine.tier)}`;
+    this.hud.banner(mine.daily ? `☀ ${t("daily_won")} ${head}` : head, rank >= 3 || mine.daily ? 4200 : 2800);
     sfx(rank >= 3 ? "jackpot" : "section");
     if (rank >= 4 && !settings.reducedMotion) this.cameras.main.flash(400, 255, 240, 200);
   }
@@ -383,9 +402,26 @@ export class BattleScene extends Phaser.Scene {
       const gateway = this.addPaintedProp("prop.gateway", x, 386, 178);
       if (gateway) this.gatewayViews.set(x, gateway);
     }
+    if ((this.room.state as any).mission === "warden") this.drawCrystalArena();
     // These are baked into bounded-size scenery chunks and are no longer drawn
     // directly. Release their extra full-resolution GPU copies after the bake.
     for (const key of ["env.station_nexus", "env.floor"]) if (this.textures.exists(key)) this.textures.remove(key);
+  }
+
+  /** Warden mission: the boss arena becomes a glowing crystal core. */
+  private drawCrystalArena() {
+    const ar = MAP.sections[2].arena;
+    const { canvas, wall } = crystalArenaCanvas(ar.w, ar.h, DS);
+    if (this.textures.exists("arena.crystal")) this.textures.remove("arena.crystal");
+    this.textures.addCanvas("arena.crystal", canvas);
+    this.add.image(ar.x, sy(ar.y) - wall, "arena.crystal").setOrigin(0).setDepth(-900);
+    if (settings.reducedMotion) return;
+    // Slow drifting motes give the chamber a living shimmer.
+    for (let i = 0; i < 22; i++) {
+      const x = ar.x + 40 + Math.random() * (ar.w - 80), y = sy(ar.y + 20 + Math.random() * (ar.h - 40));
+      const mote = this.add.circle(x, y, 1.5 + Math.random() * 2, i % 3 ? 0x9ff3ff : 0xc9a8ff, .7).setDepth(-800).setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({ targets: mote, y: y - 30 - Math.random() * 40, alpha: 0, duration: 2600 + Math.random() * 2600, repeat: -1, delay: Math.random() * 3000 });
+    }
   }
 
   private addPaintedProp(key: string, x: number, y: number, height: number) {
@@ -438,6 +474,7 @@ export class BattleScene extends Phaser.Scene {
 
   // ---- main loop --------------------------------------------------------------------
   update(_time: number, deltaMs: number) {
+    this.perf.update(deltaMs / 1000);
     const dt = Math.min(0.05, deltaMs / 1000);
     const now = performance.now();
     const st = this.room.state as any;
@@ -545,11 +582,8 @@ export class BattleScene extends Phaser.Scene {
         const spec = lin.combo.hits[L.step];
         this.swingFx(this.pred.x, this.pred.y, Math.atan2(this.facing.y, this.facing.x), spec.range, spec.arcDeg ?? 90, me.lineage, L.step, characterDisplayHeight(me.lineage, me.level, me.evolution) * .48);
         const v = this.players.get(this.room.sessionId);
-        if (v) {
-          v.lunge = 1;
-          v.oneShot = `attack${L.step + 1}`;
-          v.oneShotUntil = performance.now() + 380;
-        }
+        if (v) v.lunge = 1;
+        this.playOneShot(this.room.sessionId, `attack${L.step + 1}`, 380);
         sfx("swing");
         L.timer = lin.combo.interval[L.step];
         L.step = (L.step + 1) % 3;
@@ -609,7 +643,7 @@ export class BattleScene extends Phaser.Scene {
         const now = performance.now();
         const wanted = !alive ? ["downed"] : p.act === "dash" ? ["dodge", "run"] : view.oneShotUntil > now ? [view.oneShot, "attack1", "idle"] : moving ? ["run", "idle"] : ["idle"];
         const entry = this.animLib.drive(view.body, formId, wanted);
-        const scale = entry ? stripScale(entry, view.height) : 1;
+        const scale = entry ? stripScale(entry, view.height, this.animLib.referenceHeight(formId)) : 1;
         view.body.setPosition(sx(view.dx), sy(view.dy));
         if (fx < -.04) view.body.setFlipX(true); else if (fx > .04) view.body.setFlipX(false);
         view.body.setScale(scale).setRotation(0);
@@ -683,7 +717,7 @@ export class BattleScene extends Phaser.Scene {
           : enemy.state === "recover" && enemy.atk === "" ? ["attack", "shoot", "slam", "sweep", "idle"]
           : view.motion > .3 ? ["move", "walk", "idle"] : ["idle"];
         const entry = this.animLib.drive(view.body, enemyForm, wanted);
-        view.body.setPosition(sx(view.dx), sy(view.dy) - (enemy.kind === "support" ? 6 : 0)).setScale(entry ? stripScale(entry, view.height) : 1).setRotation(0);
+        view.body.setPosition(sx(view.dx), sy(view.dy) - (enemy.kind === "support" ? 6 : 0)).setScale(entry ? stripScale(entry, view.height, this.animLib.referenceHeight(enemyForm)) : 1).setRotation(0);
         if (enemy.fx < -.04) view.body.setFlipX(true); else if (enemy.fx > .04) view.body.setFlipX(false);
       } else {
       const scale = view.height / (artworkMetrics(painted)?.bodyHeight ?? 220);
@@ -1153,6 +1187,18 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
+  /** Starts a one-shot body animation; its length comes from the strip when available. */
+  private playOneShot(id: string, anim: string, fallbackMs: number, force = true) {
+    const v = this.players.get(id);
+    if (!v) return;
+    const now = performance.now();
+    if (!force && v.oneShotUntil > now) return;
+    const p = this.room.state.players.get(id);
+    const e = p ? this.animLib.pick(`${p.lineage}_${p.evolution || "base"}`, [anim]) : null;
+    v.oneShot = anim;
+    v.oneShotUntil = now + (e ? (e.frames / e.fps) * 1000 : fallbackMs);
+  }
+
   private onFx(f: FxEvent) {
     const myId = this.room.sessionId;
     switch (f.t) {
@@ -1160,11 +1206,8 @@ export class BattleScene extends Phaser.Scene {
         if (f.id !== myId) {
           this.swingFx(f.x, f.y, f.ang, f.range, f.arc, f.lin, f.step, (this.players.get(f.id)?.height ?? 58) * .48);
           const v = this.players.get(f.id);
-          if (v) {
-            v.lunge = 1;
-            v.oneShot = `attack${f.step + 1}`;
-            v.oneShotUntil = performance.now() + 380;
-          }
+          if (v) v.lunge = 1;
+          this.playOneShot(f.id, `attack${f.step + 1}`, 380);
         }
         break;
       case "hit": {
@@ -1199,6 +1242,10 @@ export class BattleScene extends Phaser.Scene {
       }
       case "skill":
         this.skillFx(f);
+        if (f.id !== myId) {
+          const lin = LINEAGE_SPECS[f.lin as LineageId];
+          this.playOneShot(f.id, lin?.skill2?.id === f.skill ? "skill2" : "skill1", 650);
+        }
         break;
       case "pdmg":
         if (f.id === myId) {
@@ -1212,6 +1259,8 @@ export class BattleScene extends Phaser.Scene {
         {
           const v = this.players.get(f.id);
           if (v) v.hitFlash = 1;
+          // Hurt flinch never interrupts an attack or skill.
+          this.playOneShot(f.id, "hurt", 250, false);
         }
         break;
       case "down":
@@ -1220,6 +1269,7 @@ export class BattleScene extends Phaser.Scene {
         break;
       case "revive":
         sfx("revive");
+        this.playOneShot(f.id, "revive", 500);
         break;
       case "death":
         sfx("death");
@@ -1228,7 +1278,7 @@ export class BattleScene extends Phaser.Scene {
           if (death) {
             const corpse = this.add.sprite(sx(f.x), sy(f.y), "").setDepth(sy(f.y));
             this.animLib.drive(corpse, `enemy_${f.kind}`, ["death"]);
-            corpse.setScale(stripScale(death, ENEMY_DISPLAY_HEIGHT[f.kind] ?? 60));
+            corpse.setScale(stripScale(death, ENEMY_DISPLAY_HEIGHT[f.kind] ?? 60, this.animLib.referenceHeight(`enemy_${f.kind}`)));
             corpse.once("animationcomplete", () => corpse.destroy());
           }
         }
@@ -1252,6 +1302,7 @@ export class BattleScene extends Phaser.Scene {
         break;
       case "od":
         sfx("overdrive");
+        this.playOneShot(f.id, "overdrive", 600);
         break;
       case "section":
         sfx("section");

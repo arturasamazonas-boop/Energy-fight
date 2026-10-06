@@ -257,6 +257,20 @@ export class ProfileService {
     );
   }
 
+  /**
+   * Claims today's daily reward for a run. Idempotent per run: returns true when this
+   * run owns the claim (just inserted, or inserted earlier by the same run).
+   */
+  async claimDaily(profileId: string, day: string, runId: string): Promise<boolean> {
+    await this.db.query(`INSERT INTO daily_claims (profile_id, day, run_id) VALUES ($1,$2,$3) ON CONFLICT (profile_id, day) DO NOTHING`, [profileId, day, runId]);
+    const rows = await this.db.query(`SELECT run_id FROM daily_claims WHERE profile_id = $1 AND day = $2`, [profileId, day]);
+    return rows[0]?.run_id === runId;
+  }
+
+  async dailyClaimed(profileId: string, day: string): Promise<boolean> {
+    return (await this.db.query(`SELECT 1 FROM daily_claims WHERE profile_id = $1 AND day = $2`, [profileId, day])).length > 0;
+  }
+
   /** Over the limit, the weakest unequipped older items are salvaged automatically. */
   private async enforceInventoryLimit(q: Queryer, profileId: string, keep: Set<string>) {
     const rows = await q.query(`SELECT id, rarity FROM items WHERE profile_id = $1`, [profileId]);

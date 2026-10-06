@@ -26,10 +26,19 @@
 | Laukiamajame nesimatė komandos jėgos | Prie kiekvieno žaidėjo rodoma **ekipuotės galia**. |
 | Animacijos | Paruoštas **animacijų grojimas**: ChatGPT kadrų juostas įdėjus į `client/public/assets/animations/`, veikėjai ir priešai jas groja automatiškai pagal veiksmą. Patikrinta su bandomosiomis juostomis. |
 
+## Trečias taisymų etapas
+
+| Spraga | Kas padaryta |
+| --- | --- |
+| Nebuvo priežasties grįžti kasdien | **Dienos iššūkis.** Lyderis laukiamajame jį įjungia. Kasdien keičiasi taisyklė: „Elitų diena“ (≈30% priešų elitiniai), „Pasiutimas“ (priešai 20% greitesni) arba „Stiklo patranka“ (visi muša ir gauna 30% stipriau). Pirma tos dienos pergalė kiekvienam žaidėjui duoda **bent auksinę dėžę** ir +40 laužo. Serveris tai įrašo į duomenų bazę: viena dienos dovana vienam profiliui. Laukiamajame ☀ ženklas rodo, kas šiandien dar gali ją gauti. |
+| Antras bosas kovojo tame pačiame kambaryje | Valdovo misijoje boso arena virsta **kristalų šerdimi**: tamsios violetinės grindys, runų žiedas, kristalai ant sienų, plaukiojančios kibirkštys. Plyšiai specialiai blankūs, kad nebūtų painiojami su lazeriais. |
+| Telefonų našumas | **Automatinė kokybė.** Jei kadrų dažnis 5 s laikosi žemiau 40, žaidimas pirmiausia išjungia papildomus efektus, o paskui piešia 1× raiška. Apie tai pranešama. |
+| Animacijos rodė ne viską | Įgūdžiai, sužeidimas, prisikėlimas ir perkrova dabar rodo savo kadrus, taip pat ir kitų žaidėjų. Animacijos trukmė imama iš juostos. Dydis matuojamas pagal tikrą piešinį, todėl Pyra nebėra per maža. |
+
 ## Didžiausios likusios spragos (pagal svarbą)
 
 1. **Animacijų piešiniai.** Pyra (visos 3 formos, po 12 animacijų) jau animuota tikrais kadrais. Liko Krios, Vektor, Litos, priešai ir Valdovas.
 2. **Misijos tempas.** Pailginta, bet reikia gyvo žaidimo testo, ar tempas jaučiasi gerai.
-3. **Turinys.** Pridėtas antras bosas **Kristalų Valdovas** (misija „Kristalų šerdis“): piliarų skydas, besisukantys lazeriai, šukių novos ir teleportacija. Liko: atskiras žemėlapis antram bosui, dienos iššūkis su garantuota bent auksine dėže, tikri Valdovo piešiniai.
+3. **Turinys.** Pridėtas antras bosas **Kristalų Valdovas** (misija „Kristalų šerdis“): piliarų skydas, besisukantys lazeriai, šukių novos ir teleportacija. Dienos iššūkis ir kristalų arena jau padaryti. Liko tikri Valdovo piešiniai ir daugiau misijų.
 4. **Garsas.** Garsai kol kas sintetiniai. Reikia tikrų smūgių, dėžių atidarymo garsų ir muzikos.
-5. **Telefonų našumas.** Kadrų dažnis tikruose telefonuose dar nematuotas.
+5. **Telefonų našumas.** Automatinė kokybė jau veikia, bet tikruose telefonuose kadrų dažnis dar nematuotas.

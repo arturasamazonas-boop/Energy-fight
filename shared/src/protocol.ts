@@ -100,13 +100,14 @@ export interface PlayerResult {
   objectiveSeconds: number;
   departed: boolean;
   /** Loot crate earned for the boss kill (null if not eligible or the boss was not killed). */
-  box: { tier: string; impact: number; performance: number } | null;
+  box: { tier: string; impact: number; performance: number; daily?: boolean } | null;
 }
 
 export interface LootDrop {
   id: string; // session id of the owner
   name: string;
   tier: string;
+  daily?: boolean; // first daily-challenge win of the day (box lifted to gold or better)
 }
 export interface LootMsg {
   x: number;

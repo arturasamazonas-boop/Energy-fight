@@ -20,7 +20,7 @@ export function renderResults(root: HTMLElement, res: ResultsMsg, myId: string, 
         <div class="big">${t("results_xp", { xp: p.totalXp })}</div>${carry}
         <div class="result-level">${p.levelNow >= 20 && p.levelAtStart >= 20 ? t("level_cap_note") : t("results_level", { from: p.levelAtStart, to: p.levelNow })}</div>
         <ul>
-          ${p.box ? `<li class="result-box">${crateBadgeHtml(p.box.tier)} <small>${t("box_impact", { n: p.box.impact.toFixed(2) })}</small>${p.id === myId ? ` <button class="primary open-box">${t("box_open")}</button>` : ""}</li>` : p.id === myId && res.success ? `<li class="dim">${t("box_none")}</li>` : ""}
+          ${p.box ? `<li class="result-box">${crateBadgeHtml(p.box.tier)}${p.box.daily ? `<span class="daily-badge">☀ ${t("daily_title")}</span>` : ""} <small>${t("box_impact", { n: p.box.impact.toFixed(2) })}</small>${p.id === myId ? ` <button class="primary open-box">${t("box_open")}</button>` : ""}</li>` : p.id === myId && res.success ? `<li class="dim">${t("box_none")}</li>` : ""}
           ${pending}
           ${p.supportMark ? `<li class="support">${icon("support")}${t("results_support")}</li>` : ""}
           <li class="result-currencies"><span>${icon("salvage")}${p.totalSalvage}</span><span>${icon("crystal")}${p.totalFragments}</span></li>

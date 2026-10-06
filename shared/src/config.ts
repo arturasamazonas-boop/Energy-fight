@@ -404,6 +404,28 @@ export type EnemyKind = "pursuer" | "ranged" | "armored" | "support" | "boss" | 
 export type BossVariant = "brood" | "warden";
 export const BOSS_VARIANTS: BossVariant[] = ["brood", "warden"];
 
+// ---- Daily challenge ---------------------------------------------------------
+// Opt-in (leader toggles it in the lobby). A rotating rule makes the run harder;
+// each player's first boss kill of the UTC day guarantees at least a gold box.
+export type DailyMutator = "elites" | "frenzy" | "glass";
+export const DAILY = {
+  mutators: ["elites", "frenzy", "glass"] as DailyMutator[],
+  eliteChance: 0.3, // elites: share of regular spawns promoted to elites
+  frenzySpeed: 1.2, // frenzy: enemy movement and attack-rate multiplier
+  glassDealt: 1.3, // glass: everyone hits harder…
+  glassTaken: 1.3, // …and takes more damage
+  minBox: "gold" as const,
+  bonusSalvage: 40,
+};
+const DAY_MS = 86_400_000;
+/** UTC calendar day, e.g. "2026-10-06". */
+export function dailyKey(now = Date.now()) {
+  return new Date(now).toISOString().slice(0, 10);
+}
+export function dailyMutator(now = Date.now()): DailyMutator {
+  return DAILY.mutators[Math.floor(now / DAY_MS) % DAILY.mutators.length];
+}
+
 export interface EnemySpec {
   kind: EnemyKind;
   hp: number;

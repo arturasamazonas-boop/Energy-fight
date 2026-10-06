@@ -85,3 +85,14 @@
 .mission-pick.on { outline: 2px solid #c9a44f; background: #fff3d6; }
 .boss.shielded .bar.bosshp b { background: linear-gradient(90deg, #7de8ff, #c9a8ff) !important; }
 .boss.shielded .boss-name { color: #9ff3ff !important; }
+
+/* Daily challenge toggle (lobby) */
+.daily-pick { display: flex; align-items: center; gap: 10px; width: 100%; margin: 8px 0; text-align: left; border: 1px dashed #c9a44f; background: rgba(255, 236, 190, .35); }
+.daily-pick > span:nth-child(2) { display: flex; flex-direction: column; flex: 1; }
+.daily-pick small { opacity: .8; }
+.daily-pick .daily-sun { font-size: 22px; filter: drop-shadow(0 0 4px #ffcf5a); }
+.daily-pick em { font-style: normal; font-size: 11px; font-weight: 700; letter-spacing: .06em; opacity: .7; }
+.daily-pick.on { border-style: solid; background: linear-gradient(90deg, #fff1c9, #ffe08a); box-shadow: 0 0 14px rgba(255, 200, 80, .55); }
+.daily-pick.on em { opacity: 1; color: #8a5a00; }
+.daily-chip { background: #ffe08a; color: #7a4a00; }
+.daily-badge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 8px; background: #ffe08a; color: #7a4a00; font-size: 11px; font-weight: 700; }

@@ -4,6 +4,8 @@
 import {
   ACTIVITY,
   WARDEN,
+  DAILY,
+  type DailyMutator,
   type BossVariant,
   BOSS,
   ENEMY_CAP,
@@ -158,6 +160,7 @@ export interface SimOptions {
   partySize: number;
   seed?: number;
   boss?: BossVariant;
+  mutator?: DailyMutator;
 }
 
 export interface SectionClear {
@@ -775,6 +778,7 @@ export class Sim {
   }
 
   private damageEnemy(p: SimPlayer, e: SimEnemy, raw: number, stagger: number, flinch: boolean, knockback: number, fromX: number, fromY: number, kind?: string) {
+    if (this.opts.mutator === "glass") raw *= DAILY.glassDealt;
     if (e.hp <= 0) return;
     let armor = e.spec.armor + (e.elite === "armored" ? ELITE.armorBonus : 0);
     e.lastHitT = this.time;
@@ -881,6 +885,7 @@ export class Sim {
   // ---- damage to players -----------------------------------------------------
   private damagePlayer(p: SimPlayer, raw: number, src?: SimEnemy, srcKind = ""): boolean {
     if (p.life !== "alive") return false;
+    if (this.opts.mutator === "glass") raw *= DAILY.glassTaken;
     if (p.iframes > 0) {
       // Accurately timed dodge.
       this.fx.push({ t: "perfect", id: p.id });
@@ -1002,6 +1007,7 @@ export class Sim {
       this.spawnQueue.push({ kind, x, y, required, elite });
       return;
     }
+    if (!elite && this.opts.mutator === "elites" && kind !== "boss" && kind !== "pylon" && this.rng() < DAILY.eliteChance) elite = true;
     const spec = kind === "boss" && this.opts.boss === "warden" ? (WARDEN.spec as EnemySpec) : ENEMY_SPECS[kind];
     const affix: EliteAffix | "" = elite && kind !== "boss" ? ELITE_AFFIXES[Math.floor(this.rng() * ELITE_AFFIXES.length)] : "";
     const hp = Math.round(spec.hp * (kind === "boss" ? this.hpMult.boss : this.hpMult.regular) * (affix ? ELITE.hp : 1));
@@ -1085,7 +1091,7 @@ export class Sim {
     const ty = nav.y;
     const d = dist(e.x, e.y, tx, ty);
     if (d < 1) return;
-    const sp = e.spec.speed * (e.elite === "swift" ? ELITE.swiftSpeed : 1) * (1 - this.slowOf(e)) * speedMul * DT;
+    const sp = e.spec.speed * (e.elite === "swift" ? ELITE.swiftSpeed : 1) * (this.opts.mutator === "frenzy" ? DAILY.frenzySpeed : 1) * (1 - this.slowOf(e)) * speedMul * DT;
     const m = moveOnGround(e.x, e.y, ((tx - e.x) / d) * Math.min(sp, d), ((ty - e.y) / d) * Math.min(sp, d), this.maxX, e.spec.radius * 0.6);
     e.x = m.x;
     e.y = m.y;
@@ -1113,7 +1119,7 @@ export class Sim {
       e.y = m.y;
       e.knock.t -= DT;
     }
-    e.cd = Math.max(0, e.cd - DT * (1 - this.slowOf(e) * 0.5) * (e.elite === "swift" ? ELITE.swiftCooldown : 1));
+    e.cd = Math.max(0, e.cd - DT * (1 - this.slowOf(e) * 0.5) * (e.elite === "swift" ? ELITE.swiftCooldown : 1) * (this.opts.mutator === "frenzy" ? DAILY.frenzySpeed : 1));
     if (e.elite === "regen" && this.time - e.lastHitT > ELITE.regenDelay && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + Math.ceil(e.maxHp * ELITE.regenPerSecond * DT));
     e.stagger = Math.max(0, e.stagger - DT * (e.kind === "boss" ? 6 : 10));
 

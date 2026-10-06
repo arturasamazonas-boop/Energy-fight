@@ -21,6 +21,7 @@ export function renderLobby(root: HTMLElement, room: Room, profile: ProfileView,
           <div class="mission-art"><span class="mission-location">${UI_COPY.station}</span><span class="mission-duration">${UI_COPY.expeditionTime}</span></div>
           <div class="mission-brief"><span class="eyebrow">${UI_COPY.expedition}</span><h2 class="mission-title"></h2><p class="small mission-desc"></p></div>
           <div class="missions">${["brood", "warden"].map((m) => `<button class="mission-pick" data-m="${m}"><b>${t("mission_" + m)}</b><small>${t("boss_" + m)}</small></button>`).join("")}</div>
+          <button class="daily-pick"><span class="daily-sun">☀</span><span><b>${t("daily_title")}</b><small class="daily-rule"></small></span><em class="daily-state"></em></button>
           <div class="tiers"></div>
           <p class="small carry"></p>
           <h3>${t("lineage")}</h3>
@@ -58,6 +59,7 @@ export function renderLobby(root: HTMLElement, room: Room, profile: ProfileView,
     lpick.appendChild(b);
   }
   root.querySelectorAll<HTMLButtonElement>(".mission-pick").forEach((b) => (b.onclick = () => room.send("mission", { mission: b.dataset.m })));
+  $(".daily-pick").onclick = () => room.send("daily", { on: !(room.state as any).daily });
   const tiers = $(".tiers");
   for (const ts of TIERS) {
     const b = document.createElement("button");
@@ -86,7 +88,7 @@ export function renderLobby(root: HTMLElement, room: Room, profile: ProfileView,
       rows.push(`<div class="prow${p.connected ? "" : " dc"}${id === room.sessionId ? " is-me" : ""}" style="--lin:${UI_LINEAGE_COLORS[p.lineage as LineageId]}">
         <div class="player-art">${portraitHtml(p.lineage, p.evolution ?? "", p.level, "roster-art")}</div>
         <div class="player-info"><b>${esc(p.name)}${id === room.sessionId ? `<small class="you-tag">${UI_COPY.you}</small>` : ""}</b><span>${t(p.lineage)} · ${t("level_short")} ${p.level}${p.gear ? ` · <b class="gear-chip" title="${t("gear_score")}">⚔ ${p.gear}</b>` : ""}</span>
-          <div class="player-badges">${st.leaderId === id ? `<em class="lead">${t("leader")}</em>` : ""}<em class="${p.ready ? "ok" : "no"}">${p.ready ? icon("check") : ""}${p.ready ? t("ready") : t("not_ready")}</em></div>
+          <div class="player-badges">${st.leaderId === id ? `<em class="lead">${t("leader")}</em>` : ""}${st.daily && !p.dailyDone ? `<em class="daily-chip" title="${t("daily_bonus")}">☀</em>` : ""}<em class="${p.ready ? "ok" : "no"}">${p.ready ? icon("check") : ""}${p.ready ? t("ready") : t("not_ready")}</em></div>
         </div></div>`);
     });
     for (let i = st.players.size; i < 8; i++) {
@@ -100,6 +102,14 @@ export function renderLobby(root: HTMLElement, room: Room, profile: ProfileView,
     const mission = st.mission || "brood";
     $(".mission-title").textContent = t("mission_" + mission);
     $(".mission-desc").textContent = t("mission_" + mission + "_desc");
+    {
+      const d = $(".daily-pick") as HTMLButtonElement;
+      d.classList.toggle("on", !!st.daily);
+      d.setAttribute("aria-pressed", String(!!st.daily));
+      d.disabled = !isLeader;
+      $(".daily-rule").textContent = st.dailyMutator ? `${t("mut_" + st.dailyMutator)} · ${t("daily_bonus")}` : t("daily_bonus");
+      $(".daily-state").textContent = st.daily ? t("daily_on") : t("daily_off");
+    }
     root.querySelectorAll<HTMLButtonElement>(".mission-pick").forEach((b) => {
       b.classList.toggle("on", b.dataset.m === mission);
       b.disabled = !isLeader && b.dataset.m !== mission;

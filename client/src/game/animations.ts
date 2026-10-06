@@ -15,6 +15,8 @@ export interface AnimEntry {
   loop: boolean;
   anchorX: number;
   anchorY: number;
+  /** Measured pixels from the top of the opaque body to the feet anchor (set at create). */
+  bodyHeight?: number;
 }
 
 const INDEX_KEY = "anim.index";
@@ -50,6 +52,7 @@ export class AnimLibrary {
         this.entries.delete(k);
         continue;
       }
+      e.bodyHeight = measureBody(scene, e);
       if (!scene.anims.exists(k)) {
         scene.anims.create({ key: k, frames: scene.anims.generateFrameNumbers(sheetKey(e), { start: 0, end: e.frames - 1 }), frameRate: e.fps, repeat: e.loop ? -1 : 0 });
       }
@@ -58,6 +61,15 @@ export class AnimLibrary {
 
   has(id: string, animation = "idle") {
     return this.entries.has(`${id}.${animation}`);
+  }
+
+  /**
+   * One reference body height per character/enemy id (taken from idle when present),
+   * so the sprite keeps a constant size when it switches between animations.
+   */
+  referenceHeight(id: string) {
+    const e = this.pick(id, ["idle", "run"]);
+    return e?.bodyHeight;
   }
 
   /** First available animation from a preference list. */
@@ -99,8 +111,33 @@ function sheetKey(e: AnimEntry) {
   return `anim.${e.id}.${e.animation}`;
 }
 
-/** Display scale for a strip so the body matches the target on-screen height. */
-export function stripScale(e: AnimEntry, displayHeight: number) {
-  // Bodies typically fill ~80% of the frame above the feet anchor.
-  return displayHeight / (e.anchorY * 0.8);
+/**
+ * Display scale for a strip so the body matches the target on-screen height.
+ * Uses the measured body height (reference = idle frame) when available.
+ */
+export function stripScale(e: AnimEntry, displayHeight: number, referenceBody?: number) {
+  const body = referenceBody ?? e.bodyHeight ?? e.anchorY * 0.8;
+  return displayHeight / Math.max(16, body);
+}
+
+/** Highest opaque pixel of the first frame → body height above the feet anchor. */
+function measureBody(scene: Phaser.Scene, e: AnimEntry): number | undefined {
+  try {
+    const src = scene.textures.get(sheetKey(e)).getSourceImage() as CanvasImageSource;
+    const c = document.createElement("canvas");
+    c.width = e.frameWidth;
+    c.height = e.frameHeight;
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return undefined;
+    ctx.drawImage(src, 0, 0, e.frameWidth, e.frameHeight, 0, 0, e.frameWidth, e.frameHeight);
+    const data = ctx.getImageData(0, 0, e.frameWidth, e.frameHeight).data;
+    for (let y = 0; y < e.frameHeight; y++) {
+      for (let x = 0; x < e.frameWidth; x++) {
+        if (data[(y * e.frameWidth + x) * 4 + 3] > 40) return Math.max(16, e.anchorY - y);
+      }
+    }
+  } catch {
+    // Tainted or missing image: fall back to the frame estimate.
+  }
+  return undefined;
 }

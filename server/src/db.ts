@@ -166,6 +166,16 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE items ADD COLUMN plus INTEGER NOT NULL DEFAULT 0 CHECK (plus BETWEEN 0 AND 10)
   `,
+  // 4: daily challenge claims (one guaranteed box upgrade per profile per UTC day)
+  `
+  CREATE TABLE daily_claims (
+    profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    day TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (profile_id, day)
+  )
+  `,
 ];
 
 async function migrate(db: Db) {
