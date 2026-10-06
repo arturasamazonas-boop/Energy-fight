@@ -37,7 +37,7 @@
 
 ## Didžiausios likusios spragos (pagal svarbą)
 
-1. **Animacijų piešiniai.** Pyra ir Vektor (visos formos, po 12 animacijų) jau animuoti tikrais kadrais. Vektor sklando ant žydros energijos auros. Liko Krios, Litos, priešai ir Valdovas.
+1. **Animacijų piešiniai.** Pyra, Vektor ir Krios (visos formos, po 12 animacijų) jau animuoti tikrais kadrais. Vektor sklando ant žydros energijos auros. Liko Litos, priešai ir Valdovas.
 2. **Misijos tempas.** Pailginta, bet reikia gyvo žaidimo testo, ar tempas jaučiasi gerai.
 3. **Turinys.** Pridėtas antras bosas **Kristalų Valdovas** (misija „Kristalų šerdis“): piliarų skydas, besisukantys lazeriai, šukių novos ir teleportacija. Dienos iššūkis ir kristalų arena jau padaryti. Liko tikri Valdovo piešiniai ir daugiau misijų.
 4. **Garsas.** Garsai kol kas sintetiniai. Reikia tikrų smūgių, dėžių atidarymo garsų ir muzikos.
