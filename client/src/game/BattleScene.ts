@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import type { Room } from "@colyseus/sdk";
 import {
+  COMBAT,
   LINEAGE_SPECS,
   MAP,
   OVERDRIVE,
@@ -44,6 +45,10 @@ interface PlayerView {
   texKey: string;
   lunge: number;
   hitFlash: number;
+  /** Screen-space y of the top of the head (for bars and names). */
+  headY?: number;
+  /** Health shown on the bar; trails the real value so hits read as a white chunk. */
+  hpShown?: number;
   aura: number;
   height: number;
   gait: number;
@@ -55,6 +60,9 @@ interface EnemyView {
   dx: number;
   dy: number;
   flash: number;
+  /** Hit reaction: 1 → 0 shove away from the attacker plus squash. */
+  punch?: number;
+  punchX?: number;
   kind: string;
   height: number;
   gait: number;
@@ -242,6 +250,36 @@ export class BattleScene extends Phaser.Scene {
     for (const f of this.offFns) if (typeof f === "function") f();
     this.offFns = [];
   }
+
+  /** Briefly pauses sprite animations (hit-stop). */
+  private freezeFrames(bodies: (Phaser.GameObjects.Sprite | undefined)[], ms: number) {
+    if (settings.reducedMotion) return;
+    for (const b of bodies) {
+      if (!b?.anims?.isPlaying) continue;
+      b.anims.pause();
+      this.time.delayedCall(ms, () => b.active && b.anims.resume());
+    }
+  }
+
+  /** End of run: slow the world down while the verdict lands. */
+  endCinematic(success: boolean) {
+    if (this.ended) return;
+    this.ended = true;
+    this.controls.releaseAll();
+    this.hud.endScreen(success);
+    sfx(success ? "jackpot" : "down");
+    if (settings.reducedMotion) return;
+    this.time.timeScale = 0.35;
+    this.tweens.timeScale = 0.35;
+    this.anims.globalTimeScale = 0.35;
+    const cam = this.cameras.main;
+    if (success) cam.flash(500, 255, 230, 160);
+    else cam.shake(500, 0.008);
+    this.tweens.add({ targets: cam, zoom: cam.zoom * 1.15, duration: 900, ease: "Sine.easeInOut" });
+  }
+  private ended = false;
+  private chainSeen = 0;
+  private chainAt = 0;
 
   resize() {
     const dpr = this.game.registry.get("dpr") ?? 1;
@@ -476,7 +514,8 @@ export class BattleScene extends Phaser.Scene {
 
   // ---- main loop --------------------------------------------------------------------
   update(_time: number, deltaMs: number) {
-    this.perf.update(deltaMs / 1000);
+    // Slow-motion endings and the greyed "down" screen are not a performance problem.
+    if (!this.ended && !document.body.classList.contains("is-downed")) this.perf.update(deltaMs / 1000);
     const dt = Math.min(0.05, deltaMs / 1000);
     const now = performance.now();
     const st = this.room.state as any;
@@ -650,6 +689,8 @@ export class BattleScene extends Phaser.Scene {
         if (fx < -.04) view.body.setFlipX(true); else if (fx > .04) view.body.setFlipX(false);
         view.body.setScale(scale).setRotation(0);
         this.syncHover(view, p.lineage, scale, alive, moving);
+        const topPx = this.animLib.referenceTop(formId);
+        view.headY = topPx ? view.body.y - topPx * scale : undefined;
       } else {
       const scale = view.height / (artworkMetrics(key)?.bodyHeight ?? 220);
       view.body.setPosition(sx(view.dx) + fx * hitPose * 8, sy(view.dy) + fy * hitPose * 5 * DS - stepLift);
@@ -669,7 +710,9 @@ export class BattleScene extends Phaser.Scene {
       // A hovering body casts a smaller, softer shadow.
       const flying = !!view.hover?.visible;
       view.shadow.setPosition(sx(view.dx), sy(view.dy) + 1).setDisplaySize(view.height * (flying ? .5 : .76), view.height * (flying ? .15 : .24)).setAlpha(p.life === "waiting" ? .25 : flying ? .45 : .84);
-      view.label.setText(p.name).setPosition(sx(view.dx), sy(view.dy) - view.height - 10).setDepth(95000);
+      if (!animated) view.headY = undefined;
+      const head = view.headY ?? sy(view.dy) - view.height;
+      view.label.setText(p.name).setPosition(sx(view.dx), head - 13).setDepth(95000);
       view.label.setVisible(!isMe || !alive);
     });
     for (const id of this.players.keys()) if (!seen.has(id)) this.removePlayer(id);
@@ -729,6 +772,7 @@ export class BattleScene extends Phaser.Scene {
       view.motion += ((moving ? 1 : 0) - view.motion) * Math.min(1, dt * 12);
       view.gait += dt * (2 + view.motion * (enemy.kind === "boss" ? 5 : 10));
       view.flash = Math.max(0, view.flash - dt * 9);
+      view.punch = Math.max(0, (view.punch ?? 0) - dt * 7);
       const winding = enemy.state === "windup";
       const animate = !settings.reducedMotion;
       const pulse = animate ? Math.sin(view.gait) : 0;
@@ -753,6 +797,12 @@ export class BattleScene extends Phaser.Scene {
       view.body.setScale(scale * (1 + pulse * .013), scale * (1 - pulse * .012));
       if (enemy.fx < -.04) view.body.setFlipX(true); else if (enemy.fx > .04) view.body.setFlipX(false);
       view.body.setRotation(winding ? -.035 * Math.sign(enemy.fx || 1) : pulse * view.motion * .02);
+      }
+      if (view.punch && !settings.reducedMotion && enemy.kind !== "pylon") {
+        // Impact: shoved back along the hit and squashed for a few frames.
+        const k = view.punch * view.punch;
+        view.body.x += (view.punchX ?? 0) * k * (enemy.kind === "boss" ? 3 : 9);
+        view.body.setScale(view.body.scaleX * (1 + k * .14), view.body.scaleY * (1 - k * .12));
       }
       view.body.setDepth(sy(view.dy));
       view.shadow.setPosition(sx(view.dx), sy(view.dy) + 1).setAlpha(enemy.kind === "support" ? .55 : .9);
@@ -889,6 +939,20 @@ export class BattleScene extends Phaser.Scene {
         const cy = e.y + Math.sin(e.ang) * 45;
         g.fillEllipse(sx(cx), sy(cy), 124, 124 * DS);
         g.strokeEllipse(sx(cx), sy(cy), 124, 124 * DS);
+      } else if (e.atk === "lunge") {
+        // Leap lane: a red strip with an arrow head where the pursuer will land.
+        const len = COMBAT.lunge.speed * COMBAT.lunge.duration;
+        const ca = Math.cos(e.ang), sa = Math.sin(e.ang);
+        const px = -sa * 16, py = ca * 16;
+        const ex = e.x + ca * len, ey = e.y + sa * len;
+        g.fillStyle(0xff5040, 0.18 + 0.2 * pulse);
+        g.fillPoints([
+          { x: sx(e.x + px), y: sy(e.y + py) }, { x: sx(ex + px), y: sy(ey + py) },
+          { x: sx(ex + ca * 24), y: sy(ey + sa * 24) },
+          { x: sx(ex - px), y: sy(ey - py) }, { x: sx(e.x - px), y: sy(e.y - py) },
+        ] as unknown as Phaser.Math.Vector2[], true);
+        g.lineStyle(2, 0xff6a50, 0.6 + 0.3 * pulse);
+        g.lineBetween(x, y, sx(ex), sy(ey));
       } else if (e.atk === "melee" || e.atk === "sweep") {
         const r = e.atk === "sweep" ? 170 : 60;
         const arc = (e.atk === "sweep" ? 150 : 110) * (Math.PI / 180);
@@ -941,11 +1005,33 @@ export class BattleScene extends Phaser.Scene {
       const x = sx(v.dx);
       const y = sy(v.dy);
       const isMe = id === this.room.sessionId;
-      if (!isMe && p.life === "alive") {
-        g.fillStyle(0x000000, 0.6);
-        g.fillRect(x - 18, y - v.height - 6, 36, 5);
-        g.fillStyle(0x6ee06e, 1);
-        g.fillRect(x - 17, y - v.height - 5, (34 * Math.max(0, p.hp)) / Math.max(1, p.maxHp), 3);
+      if (p.life === "alive") {
+        // Health bar over every head, including your own. Colour tracks health;
+        // a white chunk trails recent damage; cyan shows the shield on top.
+        const head = v.headY ?? y - v.height;
+        const w = isMe ? 46 : 40, h = isMe ? 6 : 5, bx = x - w / 2, by = head - 9;
+        const frac = Math.max(0, Math.min(1, p.hp / Math.max(1, p.maxHp)));
+        v.hpShown = v.hpShown === undefined || v.hpShown < frac ? frac : Math.max(frac, v.hpShown - 0.6 * (1 / 60));
+        g.fillStyle(0x0b141c, 0.85);
+        g.fillRect(bx - 1.5, by - 1.5, w + 3, h + 3);
+        g.fillStyle(0xffffff, 0.75);
+        g.fillRect(bx, by, w * v.hpShown, h);
+        const col = frac > 0.6 ? 0x5fe07a : frac > 0.3 ? 0xf2c94c : 0xf05252;
+        g.fillStyle(col, 1);
+        g.fillRect(bx, by, w * frac, h);
+        if (p.shield > 0) {
+          g.fillStyle(0x9fe8ff, 0.95);
+          g.fillRect(bx, by - 3, Math.min(w, (w * p.shield) / Math.max(1, p.maxHp)), 2);
+        }
+        if (frac <= 0.3) {
+          const blink = 0.4 + 0.4 * Math.sin(performance.now() / 110);
+          g.lineStyle(1.5, 0xff6b6b, blink);
+          g.strokeRect(bx - 2, by - 2, w + 4, h + 4);
+        }
+        if (isMe) {
+          g.fillStyle(LINEAGE_COLORS[p.lineage as LineageId]?.glowHex ?? 0xffffff, 1);
+          g.fillTriangle(x - 4, by - 7, x + 4, by - 7, x, by - 2);
+        }
       }
       if (p.shield > 0) {
         g.lineStyle(2, 0xbfe6ff, 0.7);
@@ -973,7 +1059,7 @@ export class BattleScene extends Phaser.Scene {
       }
       if (p.empower > 0) {
         g.fillStyle(0xd9ffe9, 0.9);
-        g.fillCircle(x, y - v.height - 18, 3);
+        g.fillCircle(x + 28, (v.headY ?? y - v.height) - 6, 3);
       }
       if (p.life === "downed") {
         g.lineStyle(3, 0x333333, 0.8);
@@ -1099,6 +1185,12 @@ export class BattleScene extends Phaser.Scene {
     if (me) {
       this.hud.updateSelf({ name: me.name, lineage: me.lineage, evolution: me.evolution, level: me.level, hp: me.hp, maxHp: me.maxHp, shield: me.shield, od: me.od, odT: me.odT, hasOverdrive: me.hasOverdrive, mastery: me.mastery });
       this.hud.downed(me.life === "alive" ? null : { life: me.life, downT: me.downT, revive: me.revive });
+      if (me.chain !== this.chainSeen) {
+        this.chainSeen = me.chain;
+        this.chainAt = performance.now();
+      }
+      const chainLeft = 1 - (performance.now() - this.chainAt) / (COMBAT.chainWindow * 1000);
+      this.hud.chain(me.life === "alive" ? me.chain : 0, Math.round(Math.min(COMBAT.chainMaxBonus, me.chain * COMBAT.chainPerHit) * 100), chainLeft);
       const alive = me.life === "alive";
       this.controls.setButton("dodge", { ratio: me.cdDodge / PLAYER.dodgeCooldown, enabled: alive });
       this.controls.setButton("skill1", { ratio: me.cdS1 / Math.max(0.1, me.maxS1), enabled: alive });
@@ -1240,12 +1332,24 @@ export class BattleScene extends Phaser.Scene {
         break;
       case "hit": {
         const v = this.enemies.get(f.target);
-        if (v) v.flash = 1;
+        const attacker = this.players.get(f.src);
+        if (v) {
+          v.flash = 1;
+          v.punch = 1;
+          v.punchX = attacker ? Math.sign(v.dx - attacker.dx) || 1 : 1;
+        }
         const mine = f.src === myId;
-        this.damageNumber(f.x, f.y, f.dmg, mine ? "#ffffff" : "#b9c4d0", !!f.crit);
+        this.damageNumber(f.x, f.y, f.dmg, mine ? (f.heavy ? "#ffd36b" : "#ffffff") : "#b9c4d0", !!f.crit);
         if (mine) {
-          sfx("hit");
+          sfx(f.heavy || f.crit ? "skill" : "hit");
           this.hitStop = 0.05;
+          // Hit-stop: attacker and target freeze for a beat so every hit lands with weight.
+          const ms = f.heavy ? 95 : f.crit ? 80 : 45;
+          this.freezeFrames([attacker?.body, v?.body], ms);
+          if ((f.heavy || f.crit) && !settings.reducedMotion && this.shakeCooldown <= 0) {
+            this.cameras.main.shake(110, f.heavy ? 0.006 : 0.004);
+            this.shakeCooldown = 0.12;
+          }
         }
         if (!settings.reducedEffects) {
           const source = (this.room.state as any).players?.get(f.src);
@@ -1293,7 +1397,20 @@ export class BattleScene extends Phaser.Scene {
         break;
       case "down":
         sfx("down");
-        if (f.id === myId) this.controls.releaseAll();
+        if (f.id === myId) {
+          this.controls.releaseAll();
+          // A clear "you fell" beat: red flash, heavy shake and a short zoom punch.
+          if (!settings.reducedMotion) {
+            const cam = this.cameras.main;
+            cam.flash(260, 200, 20, 20);
+            cam.shake(320, 0.012);
+            const z = cam.zoom;
+            this.tweens.add({ targets: cam, zoom: z * 1.12, duration: 180, yoyo: true, ease: "Quad.easeOut" });
+          }
+        } else {
+          const p = (this.room.state as any).players.get(f.id);
+          if (p) this.hud.banner(t("ally_down", { name: p.name }), 2200);
+        }
         break;
       case "revive":
         sfx("revive");
@@ -1326,6 +1443,12 @@ export class BattleScene extends Phaser.Scene {
         if (f.id === myId) {
           sfx("perfect");
           this.hud.banner("✦", 500);
+        }
+        break;
+      case "chain":
+        if (f.id === myId) {
+          this.hud.banner(t("combo_milestone", { n: f.n }), 1200);
+          sfx("perfect");
         }
         break;
       case "od":

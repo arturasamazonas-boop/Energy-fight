@@ -49,6 +49,17 @@ export const OVERDRIVE = {
   gainPerDamageTakenPct: 0.25,
 } as const;
 
+// Combat feel: every landed hit builds a chain that adds damage; pursuers lunge
+// at players who try to kite them from mid range.
+export const COMBAT = {
+  chainPerHit: 0.02, // +2% damage per chain step…
+  chainMaxBonus: 0.4, // …up to +40% (20 hits)
+  chainWindow: 2.2, // seconds without a landed hit before the chain drops
+  chainBreakDamage: 0.1, // a hit for ≥10% max HP halves the chain
+  chainMilestone: 10,
+  lunge: { minRange: 120, maxRange: 280, windup: 0.42, speed: 620, duration: 0.36, cooldown: 4.5, damageMult: 1.4 },
+} as const;
+
 export const ACTIVITY = {
   windowSeconds: 3,
   nearEnemyRange: 260,
@@ -442,11 +453,11 @@ export interface EnemySpec {
 }
 
 export const ENEMY_SPECS: Record<EnemyKind, EnemySpec> = {
-  pursuer: { kind: "pursuer", hp: 90, speed: 105, radius: 16, damage: 7, armor: 0, attackRange: 42, windup: 0.5, recover: 0.7, cooldown: 1.4, staggerThreshold: 20, slowCap: 0.6 },
+  pursuer: { kind: "pursuer", hp: 90, speed: 125, radius: 16, damage: 8, armor: 0, attackRange: 42, windup: 0.5, recover: 0.7, cooldown: 1.4, staggerThreshold: 20, slowCap: 0.6 },
   ranged: { kind: "ranged", hp: 70, speed: 85, radius: 15, damage: 10, armor: 0, attackRange: 300, windup: 0.85, recover: 0.6, cooldown: 2.4, staggerThreshold: 20, slowCap: 0.6 },
   armored: { kind: "armored", hp: 260, speed: 62, radius: 22, damage: 20, armor: 0.45, attackRange: 70, windup: 0.85, recover: 0.9, cooldown: 2.2, staggerThreshold: 45, slowCap: 0.5 },
   support: { kind: "support", hp: 110, speed: 70, radius: 17, damage: 6, armor: 0, attackRange: 0, windup: 2.0, recover: 1.0, cooldown: 7, staggerThreshold: 15, slowCap: 0.6 },
-  boss: { kind: "boss", hp: 3000, speed: 70, radius: 46, damage: 20, armor: 0.1, attackRange: 170, windup: 0.95, recover: 0.9, cooldown: 1.6, staggerThreshold: 160, slowCap: 0.2 },
+  boss: { kind: "boss", hp: 2600, speed: 70, radius: 46, damage: 20, armor: 0.1, attackRange: 170, windup: 0.95, recover: 0.9, cooldown: 1.6, staggerThreshold: 160, slowCap: 0.2 },
   pylon: { kind: "pylon", hp: 220, speed: 0, radius: 24, damage: 0, armor: 0, attackRange: 0, windup: 1, recover: 1, cooldown: 99, staggerThreshold: 99999, slowCap: 0 },
 };
 
@@ -466,7 +477,7 @@ export const BOSS = {
 
 /** Second boss: the Crystal Warden. Shielded by pylons; beams, shard novas and blinks. */
 export const WARDEN = {
-  spec: { kind: "boss" as const, hp: 2200, speed: 48, radius: 44, damage: 18, armor: 0.1, attackRange: 520, windup: 1.2, recover: 1.0, cooldown: 1.8, staggerThreshold: 180, slowCap: 0.2 },
+  spec: { kind: "boss" as const, hp: 1900, speed: 48, radius: 44, damage: 18, armor: 0.1, attackRange: 520, windup: 1.2, recover: 1.0, cooldown: 1.8, staggerThreshold: 180, slowCap: 0.2 },
   shieldReduction: 0.85, // damage reduction while any pylon stands
   pylons: 3,
   pylonRadius: 300, // distance of pylons from the arena centre

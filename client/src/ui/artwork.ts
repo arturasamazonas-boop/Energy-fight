@@ -17,41 +17,11 @@ const FORMS: Record<LineageId, readonly string[]> = {
   litos: ["base", "monolith", "seismic"],
 };
 
-export const UI_COPY = {
-  project: "PROJEKTAS RESONANCE",
-  station: "NEXUS · TYRIMŲ STOTIS",
-  welcomeTitle: "Mažas kūnas.\nDidelė energija.",
-  welcomeBody: "Augink savo kovotoją ir leiskis į misijas kartu su draugais.",
-  cooperative: "1–8 žaidėjai · Bendros misijos",
-  yourProfile: "Tavo profilis",
-  chooseLineage: "Pasirink savo liniją",
-  lineageHelp: "Kiekviena linija auga atskirai.",
-  abilities: "Gebėjimai",
-  health: "Gyvybės",
-  damage: "Žala",
-  beginning: "Pradžia",
-  mastery: "Meistriškumas",
-  expedition: "Kita ekspedicija",
-  expeditionHelp: "Sukviesk komandą arba prisijunk prie draugų.",
-  expeditionTime: "10–15 min.",
-  missionName: "Pralauža stotyje NEXUS",
-  missionDescription: "Pasiek stabilizatorių. Įveik Motininę masę. Grįžkite kartu.",
-  squad: "Tavo komanda",
-  openSlot: "Laisva vieta",
-  lobbyHelp: "Pasidalykite kodu ir susitikite čia.",
-  missionReady: "Pasiruošimas misijai",
-  missionComplete: "Ekspedicijos ataskaita",
-  you: "Tu",
-  support: "Komandos pagalba",
-  settingsNote: "Susikurk patogų kovos ritmą.",
-  audio: "Garsas",
-  accessibility: "Vaizdo patogumas",
-  fullscreen: "Visas ekranas",
-  selectLineage: "Pasirinkti liniją",
-  copied: "Kambario kodas nukopijuotas",
-  copyCode: "Kopijuoti kambario kodą",
-  close: "Uždaryti",
-} as const;
+const UI_COPY_KEYS = ["project", "station", "welcomeTitle", "welcomeBody", "cooperative", "yourProfile", "chooseLineage", "lineageHelp", "abilities", "health", "damage", "beginning", "mastery", "expedition", "expeditionHelp", "expeditionTime", "missionName", "missionDescription", "squad", "openSlot", "lobbyHelp", "missionReady", "missionComplete", "you", "support", "settingsNote", "audio", "accessibility", "fullscreen", "selectLineage", "copied", "copyCode", "close"] as const;
+/** Page copy, looked up in the active language (keys "ui_<name>"). */
+export const UI_COPY = new Proxy({} as Record<(typeof UI_COPY_KEYS)[number], string>, {
+  get: (_target, key: string) => t(`ui_${key}`),
+});
 
 export function characterAsset(lineage: LineageId, evolution = ""): string {
   const form = FORMS[lineage]?.includes(evolution) ? evolution : "base";

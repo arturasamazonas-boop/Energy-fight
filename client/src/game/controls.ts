@@ -37,11 +37,11 @@ export class Controls {
       <div class="stick-home" aria-hidden="true"><div class="stick-knob"></div></div>
       <div class="stick-base hidden"><div class="stick-knob"></div></div>
       <div class="btn-cluster">
-        <button class="cbtn od" data-a="overdrive" aria-label="Perkrova"><span>${actionGlyph("overdrive")}</span><kbd class="action-key">R</kbd><i></i></button>
-        <button class="cbtn s2" data-a="skill2" aria-label="2 įgūdis"><span>${actionGlyph("skill2")}</span><kbd class="action-key">E</kbd><b class="action-index">2</b><i></i></button>
-        <button class="cbtn s1" data-a="skill1" aria-label="1 įgūdis"><span>${actionGlyph("skill1")}</span><kbd class="action-key">Q</kbd><b class="action-index">1</b><i></i></button>
-        <button class="cbtn dodge" data-a="dodge" aria-label="Išsisukti"><span>${actionGlyph("dodge")}</span><kbd class="action-key">⇧</kbd><i></i></button>
-        <button class="cbtn atk" data-a="attack" aria-label="Smūgis"><span>${actionGlyph("attack")}</span><kbd class="action-key">J</kbd></button>
+        <button class="cbtn od" data-a="overdrive" aria-label="${t("ctl_overdrive")}"><span>${actionGlyph("overdrive")}</span><kbd class="action-key">R</kbd><i></i></button>
+        <button class="cbtn s2" data-a="skill2" aria-label="${t("ctl_skill2")}"><span>${actionGlyph("skill2")}</span><kbd class="action-key">E</kbd><b class="action-index">2</b><i></i></button>
+        <button class="cbtn s1" data-a="skill1" aria-label="${t("ctl_skill1")}"><span>${actionGlyph("skill1")}</span><kbd class="action-key">Q</kbd><b class="action-index">1</b><i></i></button>
+        <button class="cbtn dodge" data-a="dodge" aria-label="${t("ctl_dodge")}"><span>${actionGlyph("dodge")}</span><kbd class="action-key">⇧</kbd><i></i></button>
+        <button class="cbtn atk" data-a="attack" aria-label="${t("ctl_attack")}"><span>${actionGlyph("attack")}</span><kbd class="action-key">J</kbd></button>
       </div>
       <div class="keys-help">${t("keys_help")}</div>`;
     parent.appendChild(this.root);

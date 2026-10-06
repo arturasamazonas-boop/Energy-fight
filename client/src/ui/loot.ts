@@ -5,7 +5,6 @@ import {
   RARITY_COLORS,
   SLOTS,
   gearTotals,
-  itemName,
   effectiveStats,
   reforgeCost,
   upgradeCost,
@@ -18,7 +17,7 @@ import {
 import { api, type BoxView, type ProfileView } from "../api.ts";
 import { crateCanvas, TIER_RANK } from "../game/crate.ts";
 import { sfx, unlockAudio } from "../game/audio.ts";
-import { t } from "../i18n.ts";
+import { itemLabel, t } from "../i18n.ts";
 import { settings } from "../settings.ts";
 import { confirmDialog, esc, toast } from "./dom.ts";
 
@@ -33,7 +32,7 @@ export function statLines(stats: Partial<Record<StatId, number>>) {
 export function itemCardHtml(it: ItemInstance, extra = "") {
   const color = RARITY_COLORS[it.rarity];
   return `<div class="item-card rarity-${it.rarity}" style="--rar:${color}">
-    <div class="item-head"><span class="item-icon">${SLOT_ICONS[it.slot]}</span><div><b>${esc(itemName(it))}</b><small>${t("rarity_" + it.rarity)} · ${t("slot_" + it.slot)}</small></div></div>
+    <div class="item-head"><span class="item-icon">${SLOT_ICONS[it.slot]}</span><div><b>${esc(itemLabel(it))}</b><small>${t("rarity_" + it.rarity)} · ${t("slot_" + it.slot)}</small></div></div>
     <ul>${statLines(effectiveStats(it)).map((l) => `<li>${l}</li>`).join("")}</ul>
     ${it.special ? `<p class="item-special">✦ ${t("special_" + it.special)}</p>` : ""}
     ${extra}
@@ -114,7 +113,7 @@ export function renderArsenal(
     <div class="slots">${SLOTS.map((s) => {
       const it = eq[s] ? byId.get(eq[s]!) : undefined;
       return `<button class="slot${it ? " filled rarity-" + it.rarity : ""}" data-slot="${s}" style="--rar:${it ? RARITY_COLORS[it.rarity] : "transparent"}">
-        <span class="slot-icon">${SLOT_ICONS[s]}</span><small>${t("slot_" + s)}</small><b>${it ? esc(itemName(it)) : t("slot_empty")}</b></button>`;
+        <span class="slot-icon">${SLOT_ICONS[s]}</span><small>${t("slot_" + s)}</small><b>${it ? esc(itemLabel(it)) : t("slot_empty")}</b></button>`;
     }).join("")}</div>
     <p class="small gear-bonus">${statLines(totals.stats).join(" · ") || t("arsenal_help")}</p>
     ${totals.specials.length ? `<p class="small gear-specials">${totals.specials.map((s) => "✦ " + t("special_" + s)).join("<br>")}</p>` : ""}`;
@@ -168,7 +167,7 @@ export function renderArsenal(
             try {
               const r = kind === "upg" ? await api.upgradeItem(btn.dataset.id!) : await api.reforgeItem(btn.dataset.id!);
               sfx(kind === "upg" ? "perfect" : "crate_open");
-              toast(`${itemName(r.item)} · ${statLines(effectiveStats(r.item)).join(" · ")}`, 3500);
+              toast(`${itemLabel(r.item)} · ${statLines(effectiveStats(r.item)).join(" · ")}`, 3500);
               m.remove();
               onChange(r.profile);
             } catch (e: any) {
@@ -181,7 +180,7 @@ export function renderArsenal(
       m.querySelectorAll<HTMLButtonElement>(".dis").forEach((btn) => {
         btn.onclick = async () => {
           const it = byId.get(btn.dataset.id!)!;
-          if (!(await confirmDialog(t("item_dismantle_confirm", { name: itemName(it), n: LOOT.dismantleSalvage[it.rarity] })))) return;
+          if (!(await confirmDialog(t("item_dismantle_confirm", { name: itemLabel(it), n: LOOT.dismantleSalvage[it.rarity] })))) return;
           try {
             const r = await api.dismantle(it.id);
             m.remove();

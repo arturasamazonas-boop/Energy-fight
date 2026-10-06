@@ -7,12 +7,13 @@ import {
   PLAYER,
   UNLOCKS,
   buildLoadout,
+  gearScore,
   xpToNext,
   type LineageId,
 } from "@ef/shared";
 import { api, type ProfileView } from "../api.ts";
-import { t } from "../i18n.ts";
-import { esc, toast, confirmDialog } from "./dom.ts";
+import { lang, setLang, t, type Lang } from "../i18n.ts";
+import { esc, modal, toast, confirmDialog } from "./dom.ts";
 import { brandHtml, icon, portraitHtml, UI_COPY, UI_LINEAGE_COLORS } from "./artwork.ts";
 import { renderArsenal, type ArsenalState } from "./loot.ts";
 
@@ -43,6 +44,8 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
           <div class="wallet-item" title="${t("salvage")}">${icon("salvage")}<span><small>${t("salvage")}</small><b data-wallet="salvage">${profile.salvage}</b></span></div>
           <div class="wallet-item" title="${t("support_marks")}">${icon("support")}<span><small>${t("support_marks")}</small><b data-wallet="support">${profile.supportMarks}</b></span></div>
           <div class="wallet-item" title="${t("tiers")}">${icon("tier")}<span><small>${t("tiers")}</small><b data-wallet="tier">${profile.tierUnlocked}/3</b></span></div>
+          <div class="lang-switch compact" role="group" aria-label="${t("language")}">${(["en", "lt"] as const).map((l) => `<button class="lang-btn${lang === l ? " on" : ""}" data-lang="${l}">${l.toUpperCase()}</button>`).join("")}</div>
+          <button class="ghost help-btn icon-button" title="${t("help_title")}" aria-label="${t("help_title")}">?</button>
           <button class="ghost settings-btn icon-button" title="${t("settings")}" aria-label="${t("settings")}">${icon("settings")}</button>
         </div>
       </header>
@@ -118,7 +121,7 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
           <div class="character-stats">
             <span title="${UI_COPY.health}">${icon("shield")}<b>${L.maxHp}</b><small>${UI_COPY.health}</small></span>
             <span title="${UI_COPY.damage}">${icon("sword")}<b>${L.damage.toFixed(1)}</b><small>${UI_COPY.damage}</small></span>
-            <span title="${t("fragments")}">${icon("crystal")}<b>${rec.fragments}</b><small>${t("fragments")}</small></span>
+            <span title="${t("gear_score")}">${icon("crystal")}<b>${gearScore(Object.values(rec.equipment ?? {}).map((id) => byId.get(id!)).filter(Boolean) as any)}</b><small>${t("gear_score")}</small></span>
           </div>
           <div class="progress-caption"><span>${t("level")} ${rec.level}</span><b>${atCap ? UI_COPY.mastery : `${rec.xp} / ${need} ${t("xp")}`}</b></div>
           <div class="xpbar" role="progressbar" aria-label="${t("xp")}" aria-valuemin="0" aria-valuemax="${atCap ? 100 : need}" aria-valuenow="${atCap ? 100 : rec.xp}"><b style="width:${atCap ? 100 : Math.min(100, (rec.xp / need) * 100)}%"></b></div>
@@ -276,6 +279,8 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
     if (e.key === "Enter") join();
   };
   root.querySelector<HTMLButtonElement>(".settings-btn")!.onclick = h.onSettings;
+  root.querySelector<HTMLButtonElement>(".help-btn")!.onclick = () => openGlossary();
+  root.querySelectorAll<HTMLButtonElement>(".lab-head .lang-btn").forEach((b) => (b.onclick = () => setLang(b.dataset.lang as Lang)));
   root.querySelectorAll<HTMLButtonElement>(".dev-box").forEach(
     (b) =>
       (b.onclick = async () => {
@@ -288,4 +293,17 @@ export function renderLab(root: HTMLElement, profile: ProfileView, h: LabHandler
       }),
   );
   root.querySelectorAll<HTMLButtonElement>(".dev-seed").forEach((b) => (b.onclick = () => h.onDevSeed(Number(b.dataset.l))));
+}
+
+/** Plain-language explanation of every number the player sees. */
+export function openGlossary() {
+  const rows: [string, string][] = [
+    ["❤", "help_health"], ["⚔", "help_damage"], ["◆", "help_gear"], ["✦", "help_xp"],
+    ["⚙", "help_scrap"], ["♡", "help_support"], ["▲", "help_tiers"], ["🔥", "help_combo"],
+    ["⚡", "help_overdrive"], ["🎁", "help_crates"], ["⟳", "help_skills"],
+  ];
+  const d = modal(`<div class="modal-heading"><h2>${t("help_title")}</h2></div>
+    <dl class="glossary">${rows.map(([ic, k]) => `<div><dt><span>${ic}</span>${t(k)}</dt><dd>${t(k + "_desc")}</dd></div>`).join("")}</dl>
+    <div class="row"><button class="primary close">${t("close")}</button></div>`);
+  d.querySelector<HTMLButtonElement>(".close")!.onclick = () => d.remove();
 }

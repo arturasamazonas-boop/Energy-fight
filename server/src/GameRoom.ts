@@ -545,6 +545,7 @@ export class GameRoom extends Room {
       p.cdS2 = sp.cds.skill2;
       p.act = sp.dash ? "dash" : sp.brace ? "brace" : sp.pending ? "windup" : "";
       p.combo = sp.comboStep;
+      p.chain = Math.min(65535, sp.chain);
       p.ack = sp.lastSeq;
       p.empower = sp.empowerT;
     }

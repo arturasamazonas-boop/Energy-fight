@@ -35,6 +35,16 @@
 | Telefonų našumas | **Automatinė kokybė.** Jei kadrų dažnis 5 s laikosi žemiau 40, žaidimas pirmiausia išjungia papildomus efektus, o paskui piešia 1× raiška. Apie tai pranešama. |
 | Animacijos rodė ne viską | Įgūdžiai, sužeidimas, prisikėlimas ir perkrova dabar rodo savo kadrus, taip pat ir kitų žaidėjų. Animacijos trukmė imama iš juostos. Dydis matuojamas pagal tikrą piešinį, todėl Pyra nebėra per maža. |
 
+## Ketvirtas taisymų etapas (žaidėjo pastabos)
+
+| Pastaba | Kas padaryta |
+| --- | --- |
+| Virš žaidėjo turi matytis gyvybės | Juosta virš **kiekvieno** žaidėjo galvos, ir virš tavęs. Spalva kinta nuo žalios per geltoną iki raudonos. Balta dalis rodo ką tik prarastas gyvybes. Žydra linija – skydas. Kai lieka mažai gyvybių, juosta mirksi. |
+| Neaiški mirties emocija | **Parkritus** pasaulis pasidaro pilkas, kraštai pulsuoja raudonai, ekranas blyksteli ir sudreba. Rodomas didelis užrašas „Parkritai“ ir atgalinis laikmatis; kai draugas kelia, langas pažaliuoja. **Žuvus visai komandai** viskas sulėtėja ir užtemsta, per visą ekraną nusileidžia užrašas „MISIJA ŽLUGO“. Rezultatai rodomi tik po jo. Laimėjus – auksinis „MISIJA ĮVYKDYTA“. |
+| Neaišku, ką reiškia skaičiai | Visi skaičiai turi pavadinimus („Laužas“, „Gyvybės“, „Žala“, „Ekipuotės galia“). Niekam nenaudojami fragmentai pakeisti ekipuotės galia. Mygtukas **„?“** paaiškina kiekvieną rodiklį paprastais žodžiais. |
+| Kalba | **Anglų kalba numatytoji**, lietuvių pasirenkama mygtukais EN/LT laboratorijoje ir nustatymuose. Testas tikrina, kad kiekvienas tekstas turi abu vertimus. |
+| Kovos jausmas lėkštas, bėgiojant viską galima išvengti | **KOMBO**: kiekvienas pataikęs smūgis kelia skaitiklį, kiekviena pakopa +2% žalos (iki +40%). Nemušus 2 s kombo dingsta, o stipriai gavus – sumažėja perpus. Kas 10 smūgių – pranešimas. **Smūgio svoris**: priešas atšoka ir susispaudžia, trumpam sustoja kadrai, stiprūs ir kritiniai smūgiai sudrebina ekraną. **Bėgiojimas baudžiamas**: persekiotojai iš vidutinio atstumo šoka į tave (raudona juosta įspėja ~0,4 s prieš šuolį; galima išsisukti). Persekiotojai greitesni (105→125). **Bosai lengvesni**: Motininė masė 3000→2600 gyvybių, Valdovas 2200→1900. |
+
 ## Didžiausios likusios spragos (pagal svarbą)
 
 1. **Animacijų piešiniai.** Pyra, Vektor ir Krios (visos formos, po 12 animacijų) jau animuoti tikrais kadrais. Vektor sklando ant žydros energijos auros. Liko Litos, priešai ir Valdovas.

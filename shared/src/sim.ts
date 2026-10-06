@@ -4,6 +4,7 @@
 import {
   ACTIVITY,
   WARDEN,
+  COMBAT,
   DAILY,
   type DailyMutator,
   type BossVariant,
@@ -51,6 +52,9 @@ export interface SimPlayer {
   lastSeq: number;
   cds: { dodge: number; skill1: number; skill2: number };
   comboStep: number;
+  /** Landed-hit chain (combo counter) and seconds since the last landed hit. */
+  chain: number;
+  chainT: number;
   comboIdle: number;
   lock: number;
   pending: { kind: "combo" | "skill1" | "skill2"; t: number; spec: AttackSpec; step: number; skill?: SkillSpec } | null;
@@ -74,6 +78,7 @@ export interface SimPlayer {
 
 export type EliteAffix = "armored" | "swift" | "volatile" | "regen";
 export const ELITE_AFFIXES: EliteAffix[] = ["armored", "swift", "volatile", "regen"];
+const WORLD_PLAYER_RADIUS = 16;
 export const ELITE = { hp: 2.6, damage: 1.25, armorBonus: 0.25, swiftSpeed: 1.35, swiftCooldown: 1.45, regenPerSecond: 0.03, regenDelay: 3, volatileRadius: 95, volatileDelay: 0.9 } as const;
 
 export interface EnemyStatus {
@@ -113,6 +118,10 @@ export interface SimEnemy {
   elite: EliteAffix | "";
   lastHitT: number;
   variant: BossVariant | "";
+  /** Pursuer lunge: cooldown, remaining dash time, whether it already connected. */
+  lungeCd: number;
+  lungeT: number;
+  lungeHit: boolean;
 }
 
 export interface Hazard {
@@ -256,6 +265,8 @@ export class Sim {
       lastSeq: 0,
       cds: { dodge: 0, skill1: 0, skill2: 0 },
       comboStep: 0,
+      chain: 0,
+      chainT: 0,
       comboIdle: 0,
       lock: 0,
       pending: null,
@@ -437,6 +448,8 @@ export class Sim {
     p.iframes = Math.max(0, p.iframes - DT);
     p.empowerT = Math.max(0, p.empowerT - DT);
     p.odT = Math.max(0, p.odT - DT);
+    p.chainT += DT;
+    if (p.chain > 0 && p.chainT > COMBAT.chainWindow) p.chain = 0;
     const odMax = OVERDRIVE.maxGainPerSecond * (1 + (L.gear?.stats.overdrive ?? 0));
     p.odBudget = Math.min(odMax, p.odBudget + odMax * DT);
     p.healBudget = Math.min(p.maxHp * 0.03, p.healBudget + p.maxHp * 0.03 * DT);
@@ -651,7 +664,10 @@ export class Sim {
       if (spec.applyStatus) this.applyStatus(p, e, spec.applyStatus.id, spec.applyStatus.stacks + extraStacks, spec.applyStatus.value, spec.applyStatus.duration);
     });
 
-    if (hits.length > 0) this.gainOd(p, OVERDRIVE.gainPerHit * (kind === "combo" ? 1 : 2));
+    if (hits.length > 0) {
+      this.gainOd(p, OVERDRIVE.gainPerHit * (kind === "combo" ? 1 : 2));
+      this.addChain(p, kind === "combo" ? 1 : 2);
+    }
     if (shieldGain > 0) this.giveShield(p, Math.min(60, shieldGain), 4);
     if (spec.selfShield) this.giveShield(p, spec.selfShield.amount, spec.selfShield.duration);
 
@@ -777,6 +793,14 @@ export class Sim {
     }
   }
 
+  /** Each landed attack extends the chain; milestones are announced to clients. */
+  private addChain(p: SimPlayer, n: number) {
+    const before = p.chain;
+    p.chain = Math.min(999, p.chain + n);
+    p.chainT = 0;
+    if (Math.floor(p.chain / COMBAT.chainMilestone) > Math.floor(before / COMBAT.chainMilestone)) this.fx.push({ t: "chain", id: p.id, n: p.chain });
+  }
+
   private damageEnemy(p: SimPlayer, e: SimEnemy, raw: number, stagger: number, flinch: boolean, knockback: number, fromX: number, fromY: number, kind?: string) {
     if (this.opts.mutator === "glass") raw *= DAILY.glassDealt;
     if (e.hp <= 0) return;
@@ -792,6 +816,7 @@ export class Sim {
       raw *= LOOT.critMultiplier;
     }
     if (this.has(p, "firstStrike") && e.hp > e.maxHp * 0.9) raw *= 1 + SPECIAL_VALUES.firstStrike;
+    raw *= 1 + Math.min(COMBAT.chainMaxBonus, p.chain * COMBAT.chainPerHit);
     // The Crystal Warden is shielded while any pylon stands.
     if (e.variant === "warden" && this.pylonsAlive() > 0) raw *= 1 - WARDEN.shieldReduction;
     const dmg = Math.max(1, Math.round(raw * (1 - armor) * taken));
@@ -805,7 +830,7 @@ export class Sim {
         p.healBudget -= heal;
       }
     }
-    this.fx.push({ t: "hit", x: e.x, y: e.y, dmg, target: e.id, src: p.id, kind, crit: crit || undefined });
+    this.fx.push({ t: "hit", x: e.x, y: e.y, dmg, target: e.id, src: p.id, kind, crit: crit || undefined, heavy: stagger >= 6 || undefined });
     if (e.state === "channel") {
       e.channelDamage += dmg;
       if (e.channelDamage >= e.maxHp * SUPPORT.interruptDamageFraction || stagger >= 10) {
@@ -920,6 +945,7 @@ export class Sim {
     }
     if (dmg <= 0) return true;
     p.hp = Math.max(0, p.hp - dmg);
+    if (dmg >= p.maxHp * COMBAT.chainBreakDamage) p.chain = Math.floor(p.chain / 2);
     this.fx.push({ t: "pdmg", id: p.id, dmg, src: srcKind || src?.kind || "" });
     this.gainOd(p, (dmg / p.maxHp) * 100 * OVERDRIVE.gainPerDamageTakenPct);
     if (p.hp <= 0) {
@@ -1040,6 +1066,9 @@ export class Sim {
       bossCombo: [],
       elite: affix,
       lastHitT: 0,
+      lungeCd: 1.5 + this.rng() * 2,
+      lungeT: 0,
+      lungeHit: false,
       variant: kind === "boss" ? (this.opts.boss ?? "brood") : "",
     };
     this.enemies.set(id, e);
@@ -1119,6 +1148,18 @@ export class Sim {
       e.y = m.y;
       e.knock.t -= DT;
     }
+    e.lungeCd = Math.max(0, e.lungeCd - DT);
+    if (e.lungeT > 0) {
+      e.lungeT -= DT;
+      if (!e.lungeHit) {
+        for (const p of this.players.values()) {
+          if (p.life !== "alive" || dist(e.x, e.y, p.x, p.y) > e.spec.radius + WORLD_PLAYER_RADIUS + 8) continue;
+          e.lungeHit = true;
+          this.damagePlayer(p, e.spec.damage * this.dmgMult * (e.elite ? ELITE.damage : 1) * COMBAT.lunge.damageMult, e);
+          break;
+        }
+      }
+    }
     e.cd = Math.max(0, e.cd - DT * (1 - this.slowOf(e) * 0.5) * (e.elite === "swift" ? ELITE.swiftCooldown : 1) * (this.opts.mutator === "frenzy" ? DAILY.frenzySpeed : 1));
     if (e.elite === "regen" && this.time - e.lastHitT > ELITE.regenDelay && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + Math.ceil(e.maxHp * ELITE.regenPerSecond * DT));
     e.stagger = Math.max(0, e.stagger - DT * (e.kind === "boss" ? 6 : 10));
@@ -1180,6 +1221,15 @@ export class Sim {
       return;
     }
     const reach = e.spec.attackRange + e.spec.radius;
+    const lunge = COMBAT.lunge;
+    if (e.kind === "pursuer" && e.lungeCd <= 0 && d >= lunge.minRange && d <= lunge.maxRange && this.attackersOn(target.id, e.id) < 2) {
+      // Kiting is punished: a telegraphed leap closes the gap.
+      e.state = "windup";
+      e.t = lunge.windup;
+      e.attack = { kind: "lunge", ang: angleOf(target.x - e.x, target.y - e.y), tx: target.x, ty: target.y };
+      e.lungeCd = lunge.cooldown;
+      return;
+    }
     if (d <= reach * 2.2 && e.cd <= 0 && this.attackersOn(target.id, e.id) >= 2) {
       // Attack tokens: at most two melee attackers commit to one player at a time.
       if (d < reach * 1.6) this.moveEnemy(e, e.x - (target.x - e.x), e.y - (target.y - e.y), 0.5);
@@ -1212,6 +1262,14 @@ export class Sim {
     e.attack = null;
     if (!a) return;
     const dmg = e.spec.damage * this.dmgMult * (e.elite ? ELITE.damage : 1);
+    if (a.kind === "lunge") {
+      const lunge = COMBAT.lunge;
+      e.knock = { vx: Math.cos(a.ang) * lunge.speed, vy: Math.sin(a.ang) * lunge.speed, t: lunge.duration };
+      e.lungeT = lunge.duration;
+      e.lungeHit = false;
+      e.t = e.spec.recover + lunge.duration;
+      return;
+    }
     if (a.kind === "shot") {
       const sp = 330;
       this.addHazard({ kind: "shot", side: "enemy", ownerId: e.id, x: e.x, y: e.y, r: 10, delay: 0, life: 1.3, dps: dmg, slow: 0, vx: Math.cos(a.ang) * sp, vy: Math.sin(a.ang) * sp, stagger: 0, hitOnce: true });

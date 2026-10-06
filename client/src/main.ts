@@ -8,7 +8,7 @@ import { BattleScene } from "./game/BattleScene.ts";
 import { Controls } from "./game/controls.ts";
 import { Hud } from "./game/hud.ts";
 import { applyVolume, unlockAudio, sfx } from "./game/audio.ts";
-import { errorText, t } from "./i18n.ts";
+import { errorText, lang, setLang, t, type Lang } from "./i18n.ts";
 import { clearReconnect, createRoom, errorCode, joinRoom, loadReconnect, reconnect, saveReconnect } from "./net.ts";
 import { saveSettings, settings } from "./settings.ts";
 import { esc, modal, toast } from "./ui/dom.ts";
@@ -18,6 +18,8 @@ import { renderResults } from "./ui/results.ts";
 import { brandHtml, icon, portraitHtml, UI_COPY } from "./ui/artwork.ts";
 
 const ui = document.getElementById("ui")!;
+const rotateText = document.querySelector("#rotate p");
+if (rotateText) rotateText.textContent = t("rotate");
 const stage = document.getElementById("stage")!;
 
 let profile: ProfileView | null = null;
@@ -93,7 +95,7 @@ function askName() {
     if (button.disabled) return;
     button.disabled = true;
     try {
-      const r = await api.createGuest(input.value || "Žaidėjas");
+      const r = await api.createGuest(input.value || t("default_name"));
       setToken(r.token);
       profile = r.profile;
       showLab();
@@ -162,12 +164,23 @@ function enterRoom(r: Room) {
   r.onMessage("results", (res: ResultsMsg) => {
     lastResults = res;
     clearReconnect();
+    // Let the verdict land in the battle view first (slow-motion + big title).
+    const scene = game?.scene.getScene("battle") as BattleScene | null;
+    if (scene && !(window as any).__efSkipEnd) {
+      scene.endCinematic(res.success);
+      window.setTimeout(() => showResults(r, res), res.success ? 2600 : 3000);
+      return;
+    }
+    showResults(r, res);
+  });
+  const showResults = (r: Room, res: ResultsMsg) => {
+    if (room !== r) return;
     teardownGame();
     document.body.classList.remove("in-game");
     const evolutions = new Map<string, string>();
     (r.state as any)?.players?.forEach((p: any, id: string) => evolutions.set(id, p.evolution ?? ""));
     renderResults(ui, res, r.sessionId, () => leaveRoom(), evolutions);
-  });
+  };
   r.onDrop?.(() => {
     controls?.releaseAll();
     hud?.connection(t("disconnected"));
@@ -295,8 +308,13 @@ function openMenu() {
   };
 }
 
+function langSwitchHtml() {
+  return `<div class="lang-switch" role="group" aria-label="${t("language")}">${(["en", "lt"] as const).map((l) => `<button class="lang-btn${lang === l ? " on" : ""}" data-lang="${l}" aria-pressed="${lang === l}">${l.toUpperCase()}</button>`).join("")}</div>`;
+}
+
 function settingsHtml() {
   return `
+    <section class="settings-group"><h4>${t("language")}</h4>${langSwitchHtml()}</section>
     <section class="settings-group"><h4>${UI_COPY.audio}</h4><label class="set volume-setting"><span>${icon("sound")}${t("volume")}<output class="volume-value">${Math.round(settings.volume * 100)}%</output></span><input type="range" class="vol" min="0" max="1" step="0.05" value="${settings.volume}" aria-label="${t("volume")}"></label></section>
     <section class="settings-group"><h4>${UI_COPY.accessibility}</h4>
       <label class="set toggle-setting"><span>${icon("motion")}${t("reduced_motion")}</span><input type="checkbox" class="rm" ${settings.reducedMotion ? "checked" : ""}></label>
@@ -311,6 +329,7 @@ function applyUiSettings() {
 }
 
 function bindSettings(d: HTMLElement) {
+  d.querySelectorAll<HTMLButtonElement>(".lang-btn").forEach((b) => (b.onclick = () => setLang(b.dataset.lang as Lang)));
   const vol = d.querySelector<HTMLInputElement>(".vol")!;
   vol.oninput = () => {
     settings.volume = Number(vol.value);

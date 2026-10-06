@@ -54,7 +54,7 @@ export function isLineage(v: unknown): v is LineageId {
 
 // Server → client one-shot presentation events, batched per tick.
 export type FxEvent =
-  | { t: "hit"; x: number; y: number; dmg: number; crit?: boolean; target: string; src: string; kind?: string }
+  | { t: "hit"; x: number; y: number; dmg: number; crit?: boolean; heavy?: boolean; target: string; src: string; kind?: string }
   | { t: "swing"; id: string; x: number; y: number; ang: number; range: number; arc: number; lin: string; step: number }
   | { t: "skill"; id: string; skill: string; x: number; y: number; ang: number; range: number; lin: string; evo: string }
   | { t: "pdmg"; id: string; dmg: number; src?: string }
@@ -64,6 +64,7 @@ export type FxEvent =
   | { t: "shield"; id: string }
   | { t: "perfect"; id: string }
   | { t: "od"; id: string; lin: string }
+  | { t: "chain"; id: string; n: number }
   | { t: "section"; id: number }
   | { t: "msg"; key: string };
 

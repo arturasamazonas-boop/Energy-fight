@@ -1,5 +1,9 @@
-// Central dictionary for all player-facing text (Lithuanian).
-const LT: Record<string, string> = {
+// Central dictionary for all player-facing text.
+// English is the default; Lithuanian is selectable (settings or lab header).
+import { EN, EN_ITEMS } from "./lang/en.ts";
+import { itemName, type ItemInstance } from "@ef/shared";
+
+const LT_CORE: Record<string, string> = {
   title: "ENERGY FIGHT",
   subtitle: "Projektas RESONANCE · kooperatinis prototipas",
   name_prompt: "Kaip tave vadinti?",
@@ -7,7 +11,7 @@ const LT: Record<string, string> = {
   continue: "Tęsti",
   loading: "Kraunama…",
   lab: "Laboratorija",
-  lineage: "Linija",
+  lineage: "Herojus",
   level: "Lygis",
   level_short: "Lv",
   xp: "XP",
@@ -125,8 +129,84 @@ const LT: Record<string, string> = {
   err_generic: "Įvyko klaida: {code}",
   dev_tools: "Testavimo profiliai (tik kūrimui)",
   dev_seed: "Sukurti {level} lygio profilį",
-  keys_help: "Klaviatūra: WASD/rodyklės – judėti, Tarpas/J – smūgis (laikyk), Shift/K – išsisukti, Q/U – 1 įgūdis, E/I – 2 įgūdis, R/O – perkrova.",
-  touch_help: "Telefone: kairė pusė – judėjimo vairalazdė, dešinė – mygtukai. Laikyk smūgio mygtuką kombinacijai.",
+  keys_help: "Klaviatūra: WASD/rodyklės – judėti, Tarpas/J – smūgis (spausk arba laikyk), Shift/K – išsisukti, Q/U – 1 įgūdis, E/I – 2 įgūdis, R/O – perkrova.",
+  touch_help: "Telefone: kairė pusė – judėjimo vairalazdė, dešinė – mygtukai. Spausk smūgį ritmu – gausi kombinaciją.",
+  default_name: "Žaidėjas",
+  language: "Kalba",
+  down_title: "Parkritai",
+  down_reviving: "Tave kelia – būk šalia!",
+  out_title: "Žuvai",
+  ally_down: "{name} parkrito – pakelk!",
+  end_win: "Misija įvykdyta",
+  end_win_sub: "Visi grįžo namo.",
+  end_fail: "Misija žlugo",
+  end_fail_sub: "Visa komanda krito.",
+  ui_project: "PROJEKTAS RESONANCE",
+  ui_station: "NEXUS · TYRIMŲ STOTIS",
+  ui_welcomeTitle: "Mažas kūnas.\nDidelė energija.",
+  ui_welcomeBody: "Augink savo kovotoją ir leiskis į misijas kartu su draugais.",
+  ui_cooperative: "1–8 žaidėjai · Bendros misijos",
+  ui_yourProfile: "Tavo profilis",
+  ui_chooseLineage: "Pasirink savo herojų",
+  ui_lineageHelp: "Kiekvienas herojus auga atskirai.",
+  ui_abilities: "Gebėjimai",
+  ui_health: "Gyvybės",
+  ui_damage: "Žala",
+  ui_beginning: "Pradžia",
+  ui_mastery: "Meistriškumas",
+  ui_expedition: "Kita ekspedicija",
+  ui_expeditionHelp: "Sukviesk komandą arba prisijunk prie draugų.",
+  ui_expeditionTime: "10–15 min.",
+  ui_missionName: "Pralauža stotyje NEXUS",
+  ui_missionDescription: "Pasiek stabilizatorių. Įveik Motininę masę. Grįžkite kartu.",
+  ui_squad: "Tavo komanda",
+  ui_openSlot: "Laisva vieta",
+  ui_lobbyHelp: "Pasidalykite kodu ir susitikite čia.",
+  ui_missionReady: "Pasiruošimas misijai",
+  ui_missionComplete: "Ekspedicijos ataskaita",
+  ui_you: "Tu",
+  ui_support: "Komandos pagalba",
+  ui_settingsNote: "Susikurk patogų kovos ritmą.",
+  ui_audio: "Garsas",
+  ui_accessibility: "Vaizdo patogumas",
+  ui_fullscreen: "Visas ekranas",
+  ui_selectLineage: "Pasirinkti herojų",
+  ui_copied: "Kambario kodas nukopijuotas",
+  ui_copyCode: "Kopijuoti kambario kodą",
+  ui_close: "Uždaryti",
+  help_title: "Ką reiškia skaičiai?",
+  help_health: "Gyvybės",
+  help_health_desc: "Kiek žalos herojus atlaiko, kol parkrenta. Kovoje tai rodo juosta virš galvos.",
+  help_damage: "Žala",
+  help_damage_desc: "Vieno smūgio bazinė žala. Įgūdžiai, kombo, kritiniai smūgiai ir ekipuotė ją didina.",
+  help_gear: "Ekipuotės galia",
+  help_gear_desc: "Bendra šio herojaus dėvimų daiktų jėga. Retesni ir patobulinti daiktai skaičiuojami daugiau.",
+  help_xp: "Lygis ir XP",
+  help_xp_desc: "Už įveiktas misijos dalis gauni XP. Lygiai didina gyvybes ir žalą, atrakina 2 įgūdį, perkrovą ir evoliuciją.",
+  help_scrap: "Laužas ⚙",
+  help_scrap_desc: "Žaidimo pinigai. Gaunamas už misijas, iš dėžių ir išardžius daiktus. Leidžiamas moduliams ir daiktų tobulinimui.",
+  help_support: "Pagalbos ženklai ♡",
+  help_support_desc: "Ženkliukai už pagalbą žemesnio lygio draugui boso kovoje. Rodo, kad esi geras komandos draugas.",
+  help_tiers: "Misijos lygiai ▲",
+  help_tiers_desc: "Sunkumo lygiai. Įveikus visą misiją atsirakina kitas lygis su stipresniais priešais ir geresniu atlygiu.",
+  help_combo: "Kombo",
+  help_combo_desc: "Kiekvienas pataikęs smūgis kelia kombo. Kiekviena pakopa prideda žalos (iki +40%). Nemuši 2 sekundes – kombo dingsta; stiprus gautas smūgis jį perpus sumažina.",
+  help_overdrive: "Perkrova",
+  help_overdrive_desc: "Kaupiasi kovojant ir gaunant žalos. Kai pilna, spausk OD: 8 sekundės daug stipresnių smūgių.",
+  help_crates: "Dėžės",
+  help_crates_desc: "Bosas palieka po dėžę kiekvienam aktyviam žaidėjui. Kuo didesnis tavo įnašas pagal lygį, tuo geresnė dėžė.",
+  help_skills: "Įgūdžiai ir atsistatymas",
+  help_skills_desc: "Įgūdžio mygtukas blankus, kol krauna. Ratas pildosi, kol įgūdis grįžta.",
+  combo: "KOMBO",
+  combo_dmg: "žalos",
+  combo_milestone: "KOMBO ×{n}!",
+  obj_done: "Misija baigta",
+  ctl_skill1: "1 įgūdis",
+  ctl_skill2: "2 įgūdis",
+  ctl_dodge: "Išsisukti",
+  ctl_attack: "Smūgis",
+  ctl_overdrive: "Perkrova",
+  menu: "Meniu",
 };
 
 const LOOT_TEXT: Record<string, string> = {
@@ -134,9 +214,9 @@ const LOOT_TEXT: Record<string, string> = {
   msg_elite_swift: "Elitinis priešas: GREITAS",
   msg_elite_volatile: "Elitinis priešas: SPROGUS – trauktis, kai žūva!",
   msg_elite_regen: "Elitinis priešas: ATSINAUJINANTIS – nepaleisk jo!",
-  tip_move: "Kairėje ekrano pusėje vesk pirštu – judėsi. Laikyk didelį mygtuką dešinėje – smūgiuosi.",
-  tip_move_keys: "WASD – judėti, laikyk Tarpą – smūgiuoti, Shift – išsisukti.",
-  tip_attack: "Laikyk smūgio mygtuką – herojus atliks 3 smūgių kombinaciją.",
+  tip_move: "Kairėje ekrano pusėje vesk pirštu – judėsi. Spausk didelį mygtuką dešinėje – smūgiuosi.",
+  tip_move_keys: "WASD – judėti, Tarpas – smūgiuoti, Shift – išsisukti.",
+  tip_attack: "Mušk be sustojimo! Kiekvienas smūgis kelia KOMBO – kuo didesnis kombo, tuo didesnė žala.",
   tip_dodge: "Raudona zona – priešas tuoj smogs! Spausk išsisukimą ⤳ ir ištrūk.",
   tip_skill: "Įgūdis paruoštas – spausk 1. Jis stipresnis už paprastą smūgį.",
   tip_revive: "Draugas parkrito! Stovėk šalia jo, kol užsipildys žalias ratas.",
@@ -282,17 +362,49 @@ const NAMES: Record<string, string> = {
   carapace_desc: "Maks. gyvybės +5% už rangą.",
 };
 
+const LT: Record<string, string> = { ...LT_CORE, ...LOOT_TEXT, ...NAMES };
+
+export type Lang = "en" | "lt";
+const LANG_KEY = "ef.lang";
+function readLang(): Lang {
+  try {
+    const v = localStorage.getItem(LANG_KEY);
+    if (v === "lt" || v === "en") return v;
+  } catch {}
+  return "en";
+}
+export const lang: Lang = readLang();
+if (typeof document !== "undefined") document.documentElement.lang = lang;
+
+/** Switches language; the page reloads so every screen re-renders in it. */
+export function setLang(next: Lang) {
+  if (next === lang) return;
+  try {
+    localStorage.setItem(LANG_KEY, next);
+  } catch {}
+  location.reload();
+}
+
 export function t(key: string, vars: Record<string, string | number> = {}): string {
-  let s = LT[key] ?? LOOT_TEXT[key] ?? NAMES[key] ?? key;
+  let s = (lang === "en" ? EN[key] : LT[key]) ?? LT[key] ?? EN[key] ?? key;
   for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v));
   return s;
 }
 
+/** Localised item name (Lithuanian names come from the shared catalogue). */
+export function itemLabel(item: Pick<ItemInstance, "baseId" | "slot"> & { plus?: number }): string {
+  if (lang === "en") {
+    const key = item.baseId.startsWith("ultra_") ? item.baseId : `${item.slot}_${(Number(item.baseId.split("_")[1]) || 0) % 6}`;
+    const name = EN_ITEMS[key];
+    if (name) return name + (item.plus ? ` +${item.plus}` : "");
+  }
+  return itemName(item);
+}
+
 export function errorText(code: string): string {
   const k = `err_${code}`;
-  if (LT[k]) return LT[k];
-  if (LOOT_TEXT[k]) return LOOT_TEXT[k];
-  if (/full|maxClients/i.test(code)) return LT.err_room_full;
-  if (/not found|not_found|no rooms/i.test(code)) return LT.err_room_not_found;
+  if (LT[k]) return t(k);
+  if (/full|maxClients/i.test(code)) return t("err_room_full");
+  if (/not found|not_found|no rooms/i.test(code)) return t("err_room_not_found");
   return t("err_generic", { code });
 }

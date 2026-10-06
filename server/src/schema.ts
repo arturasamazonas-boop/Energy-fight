@@ -30,6 +30,7 @@ export class PlayerS extends Schema {
   @type("boolean") hasOverdrive = false;
   @type("string") act = ""; // "", "windup", "dash", "brace"
   @type("uint8") combo = 0;
+  @type("uint16") chain = 0; // landed-hit chain (combo counter)
   @type("uint32") ack = 0;
   @type("float32") empower = 0;
   @type("uint8") tierUnlocked = 1;

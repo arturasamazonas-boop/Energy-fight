@@ -17,6 +17,8 @@ export interface AnimEntry {
   anchorY: number;
   /** Measured pixels from the top of the opaque body to the feet anchor (set at create). */
   bodyHeight?: number;
+  /** Measured pixels from the top of the body up from the feet anchor (includes hover air). */
+  topOffset?: number;
 }
 
 const INDEX_KEY = "anim.index";
@@ -52,7 +54,9 @@ export class AnimLibrary {
         this.entries.delete(k);
         continue;
       }
-      e.bodyHeight = measureBody(scene, e);
+      const m = measureBody(scene, e);
+      e.bodyHeight = m?.height;
+      e.topOffset = m?.top;
       if (!scene.anims.exists(k)) {
         scene.anims.create({ key: k, frames: scene.anims.generateFrameNumbers(sheetKey(e), { start: 0, end: e.frames - 1 }), frameRate: e.fps, repeat: e.loop ? -1 : 0 });
       }
@@ -70,6 +74,11 @@ export class AnimLibrary {
   referenceHeight(id: string) {
     const e = this.pick(id, ["idle", "run"]);
     return e?.bodyHeight;
+  }
+
+  /** Pixels from the feet anchor up to the top of the head (idle reference). */
+  referenceTop(id: string) {
+    return this.pick(id, ["idle", "run"])?.topOffset;
   }
 
   /** First available animation from a preference list. */
@@ -125,7 +134,7 @@ export function stripScale(e: AnimEntry, displayHeight: number, referenceBody?: 
  * Hovering characters leave air between the body and the feet anchor; that gap
  * is not counted, so a flyer is sized like everyone else and still floats.
  */
-function measureBody(scene: Phaser.Scene, e: AnimEntry): number | undefined {
+function measureBody(scene: Phaser.Scene, e: AnimEntry): { height: number; top: number } | undefined {
   try {
     const src = scene.textures.get(sheetKey(e)).getSourceImage() as CanvasImageSource;
     const c = document.createElement("canvas");
@@ -143,7 +152,7 @@ function measureBody(scene: Phaser.Scene, e: AnimEntry): number | undefined {
     for (let y = 0; y < e.frameHeight && top < 0; y++) if (opaqueRow(y)) top = y;
     for (let y = e.frameHeight - 1; y >= 0 && bottom < 0; y--) if (opaqueRow(y)) bottom = y;
     if (top < 0) return undefined;
-    return Math.max(16, Math.min(bottom, e.anchorY) - top);
+    return { height: Math.max(16, Math.min(bottom, e.anchorY) - top), top: Math.max(16, e.anchorY - top) };
   } catch {
     // Tainted or missing image: fall back to the frame estimate.
   }

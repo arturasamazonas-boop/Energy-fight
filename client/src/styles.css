@@ -413,7 +413,7 @@ body.in-game #stage { display: block; }
   .brand-type .eyebrow { font-size: 6px; }
   .wallet { gap: 12px; }
   .wallet-item > .ui-icon { width: 16px; height: 16px; }
-  .wallet-item small { display: none; }
+  .wallet-item small { font-size: 7.5px; letter-spacing: .04em; }
   .wallet-item b { font-size: 12px; }
   .lab-actions { padding: 11px; margin: 17px 0; }
   .expedition-copy { display: none; }
@@ -558,7 +558,7 @@ body.in-game #stage { display: block; }
   .brand-emblem .ui-icon { width: 23px; height: 23px; }
   .brand-type strong { font-size: 17px; }
   .brand-type .eyebrow { font-size: 6px; }
-  .wallet-item small { display: none; }
+  .wallet-item small { font-size: 7.5px; letter-spacing: .04em; }
   .wallet-item b { font-size: 12px; }
   .wallet-item .ui-icon { width: 16px; height: 16px; }
   .settings-btn { min-height: 36px; width: 36px; padding: 8px; }
@@ -591,7 +591,7 @@ body.in-game #stage { display: block; }
   .lineage-description { font-size: 11px; line-height: 1.45; margin: 9px 0; }
   .character-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 12px; }
   .character-stats > span { display: flex; flex-direction: column; gap: 3px; padding-right: 3px; }
-  .character-stats small { display: none; }
+  .character-stats small { font-size: 8.5px; display: block; line-height: 1.1; }
   .character-stats b { font-size: 11px; }
   .character-stats .ui-icon { width: 13px; height: 13px; }
   .progress-caption { font-size: 10px; }
@@ -693,3 +693,17 @@ body.reduce-effects .character-art img, body.reduce-effects .character-art::afte
   .lineage-detail { grid-template-columns: minmax(145px, .85fr) minmax(200px, 1.15fr); }
   .lobby-body { grid-template-columns: minmax(0, 1fr) minmax(235px, .9fr); }
 }
+
+/* Language switch */
+.lang-switch { display: inline-flex; border: 1px solid #c0a77b80; border-radius: 999px; overflow: hidden; }
+.lang-switch .lang-btn { min-height: 30px; padding: 4px 12px; border: 0; border-radius: 0; background: transparent; color: inherit; font-weight: 700; letter-spacing: .06em; box-shadow: none; }
+.lang-switch .lang-btn.on { background: #d4b06a; color: #1b2a2e; }
+.lang-switch.compact .lang-btn { min-height: 26px; padding: 2px 9px; font-size: 12px; }
+
+/* Glossary */
+.help-btn { font-weight: 800; font-size: 16px; }
+.glossary { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px 16px; margin: 6px 0 12px; max-height: 58vh; overflow: auto; }
+.glossary > div { padding: 6px 8px; border-left: 3px solid #d4b06a; background: #00000010; border-radius: 4px; }
+.glossary dt { font-weight: 800; display: flex; gap: 6px; align-items: center; }
+.glossary dt span { width: 20px; text-align: center; }
+.glossary dd { margin: 2px 0 0 26px; font-size: 13px; line-height: 1.35; opacity: .85; }

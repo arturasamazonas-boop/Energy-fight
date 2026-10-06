@@ -112,3 +112,14 @@ A window counts as able-to-act if the body was alive for at least half of it. A 
 ## Automatic quality
 
 `client/src/game/perf.ts`: after a 4 s warm-up, a smoothed FPS below 40 for 5 s steps quality down once per level. The first step reduces effects, the second drops render resolution to 1×. It never steps back up within a session.
+
+## Combat feel (round 4)
+
+- **Chain (combo counter).** Each landed attack adds 1 (skills add 2). Damage is ×(1 + 2% × chain), capped at +40%. The chain drops after 2.2 s without a landed hit. A hit for ≥10% max HP halves it. Every 10 steps sends a `chain` fx for a banner. Synced as `PlayerS.chain`.
+- **Pursuer lunge.** It triggers from 120–280 units with a 0.42 s telegraph (red lane), then dashes at 620/s for 0.36 s. It hits once for 1.4× damage, with a 4.5 s cooldown. Kiting for 30 s against 4 pursuers now costs about 30% more health than before (scratch measurement).
+- **Feedback.** `hit` fx carries `heavy` (stagger ≥ 6). The client shoves and squashes the target, freezes attacker and target animations for 45–95 ms, and shakes the camera on heavy hits and crits.
+- **Down / defeat.** The client greys out the world and shows a pulsing red vignette with a big bleed-out timer while downed. On results, the battle plays a 2.6–3 s slow-motion verdict before the results page.
+
+## Languages
+
+English is the default (`client/src/lang/en.ts`). Lithuanian lives in `client/src/i18n.ts`. The choice is stored in `localStorage["ef.lang"]` and switching reloads the page. `tests/i18n.test.ts` fails when a key exists in only one language.

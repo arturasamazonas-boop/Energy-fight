@@ -23,7 +23,7 @@ export function renderResults(root: HTMLElement, res: ResultsMsg, myId: string, 
           ${p.box ? `<li class="result-box">${crateBadgeHtml(p.box.tier)}${p.box.daily ? `<span class="daily-badge">☀ ${t("daily_title")}</span>` : ""} <small>${t("box_impact", { n: p.box.impact.toFixed(2) })}</small>${p.id === myId ? ` <button class="primary open-box">${t("box_open")}</button>` : ""}</li>` : p.id === myId && res.success ? `<li class="dim">${t("box_none")}</li>` : ""}
           ${pending}
           ${p.supportMark ? `<li class="support">${icon("support")}${t("results_support")}</li>` : ""}
-          <li class="result-currencies"><span>${icon("salvage")}${p.totalSalvage}</span><span>${icon("crystal")}${p.totalFragments}</span></li>
+          <li class="result-currencies"><span title="${t("help_scrap_desc")}">${icon("salvage")}${t("salvage")} +${p.totalSalvage}</span></li>
           <li>${t("results_revives", { n: p.revives })} · ${t("results_control", { n: p.controlSeconds })} · ${t("results_objective", { n: p.objectiveSeconds })}</li>
           <li class="dim">${t("results_damage", { n: p.damage })} · ${t("results_stagger", { n: p.stagger })}</li>
           ${missed.join("")}

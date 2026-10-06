@@ -35,14 +35,16 @@ export class Hud {
         <div class="boss hidden"><div class="boss-name">${t("boss_name")}</div><div class="bar bosshp"><b></b></div><div class="bar stag"><b></b></div></div>
       </div>
       <div class="hud-team"><div class="hud-team-count"></div><div class="team-members"></div></div>
-      <button class="hud-menu" aria-label="Meniu">${actionGlyph("menu")}</button>
+      <button class="hud-menu" aria-label="${t("menu")}">${actionGlyph("menu")}</button>
+      <div class="hud-chain hidden"><b class="chain-n">0</b><span class="chain-label"></span><em class="chain-bonus"></em><i class="chain-timer"><u></u></i></div>
       <div class="hud-banner hidden"></div>
-      <div class="hud-down hidden"><div class="down-title"></div><div class="bar revive"><b></b></div><div class="down-sub"></div></div>
+      <div class="hud-down hidden"><div class="down-skull">✖</div><div class="down-title"></div><div class="down-timer"></div><div class="bar revive"><b></b></div><div class="down-sub"></div></div>
+      <div class="hud-end hidden"><div class="end-title"></div><div class="end-sub"></div></div>
       <div class="hud-conn hidden"></div>
       <div class="hud-loading"><div class="loading-sigil"></div><span>${t("loading")}</span><div class="bar loading"><b></b></div></div>
       <div class="vignette"></div>`;
     parent.appendChild(this.root);
-    for (const key of ["hud-name", "hud-portrait", "hud-team", "hud-team-count", "team-members", "hud-section", "obj-text", "boss", "hud-banner", "hud-down", "down-title", "down-sub", "hud-conn", "hud-loading", "vignette"]) {
+    for (const key of ["hud-name", "hud-portrait", "hud-team", "hud-team-count", "team-members", "hud-section", "obj-text", "boss", "hud-banner", "hud-chain", "chain-n", "chain-label", "chain-bonus", "hud-down", "down-title", "down-sub", "down-timer", "hud-end", "end-title", "end-sub", "hud-conn", "hud-loading", "vignette"]) {
       this.els[key] = this.root.querySelector("." + key)!;
     }
     for (const key of ["hp", "od", "obj", "bosshp", "stag", "revive", "loading"]) this.bars.set(key, this.root.querySelector(`.bar.${key} b`)!);
@@ -136,6 +138,7 @@ export class Hud {
 
   banner(text: string, ms = 2200) {
     const element = this.els["hud-banner"];
+    if (this.ended) return;
     element.textContent = text;
     element.classList.remove("hidden", "pop");
     void element.offsetWidth;
@@ -144,13 +147,60 @@ export class Hud {
     this.bannerTimer = window.setTimeout(() => element.classList.add("hidden"), ms);
   }
 
+  private lastChain = 0;
+  /** Combo counter: pops on every new hit, colour climbs with the chain. */
+  chain(n: number, bonusPct: number, windowLeft: number) {
+    const el = this.els["hud-chain"];
+    if (n < 2) {
+      if (this.lastChain >= 2) el.classList.add("hidden");
+      this.lastChain = n;
+      return;
+    }
+    el.classList.remove("hidden");
+    if (n !== this.lastChain) {
+      this.els["chain-n"].textContent = String(n);
+      this.els["chain-label"].textContent = t("combo");
+      this.els["chain-bonus"].textContent = `+${bonusPct}% ${t("combo_dmg")}`;
+      el.className = `hud-chain tier${n >= 20 ? 3 : n >= 10 ? 2 : 1}`;
+      if (n > this.lastChain) {
+        el.classList.remove("pop");
+        void el.offsetWidth;
+        el.classList.add("pop");
+      }
+      this.lastChain = n;
+    }
+    (el.querySelector(".chain-timer u") as HTMLElement).style.width = `${Math.max(0, Math.min(1, windowLeft)) * 100}%`;
+  }
+
+  /** Local player down: grey world, pulsing red edge, bleed-out timer and revive progress. */
   downed(state: { life: string; downT: number; revive: number } | null) {
     const element = this.els["hud-down"];
-    if (!state || state.life === "alive" || state.life === "departed") { element.classList.add("hidden"); return; }
+    if (this.ended) return;
+    const down = !!state && (state.life === "downed" || state.life === "waiting");
+    document.body.classList.toggle("is-downed", down && state!.life === "downed");
+    document.body.classList.toggle("is-out", down && state!.life === "waiting");
+    if (!down) { element.classList.add("hidden"); return; }
     element.classList.remove("hidden");
-    this.els["down-title"].textContent = t(state.life === "downed" ? "downed" : "waiting_checkpoint");
-    this.els["down-sub"].textContent = state.life === "downed" ? `${Math.ceil(state.downT)} s` : "";
-    this.bar("revive", state.life === "downed" ? state.revive : 0);
+    const downed = state!.life === "downed";
+    element.classList.toggle("reviving", downed && state!.revive > 0.02);
+    this.els["down-title"].textContent = t(downed ? "down_title" : "out_title");
+    this.els["down-timer"].textContent = downed ? `${Math.max(0, Math.ceil(state!.downT))}` : "";
+    this.els["down-sub"].textContent = downed ? t(state!.revive > 0.02 ? "down_reviving" : "downed") : t("waiting_checkpoint");
+    this.bar("revive", downed ? state!.revive : 0);
+  }
+
+  /** Run is over: big verdict across the screen before the results page. */
+  private ended = false;
+  endScreen(success: boolean) {
+    this.ended = true;
+    this.els["hud-banner"].classList.add("hidden");
+    this.els["hud-chain"].classList.add("hidden");
+    document.body.classList.remove("is-downed", "is-out");
+    document.body.classList.add(success ? "run-won" : "run-lost");
+    this.els["hud-down"].classList.add("hidden");
+    this.els["end-title"].textContent = t(success ? "end_win" : "end_fail");
+    this.els["end-sub"].textContent = t(success ? "end_win_sub" : "end_fail_sub");
+    this.els["hud-end"].className = `hud-end ${success ? "win" : "fail"}`;
   }
 
   connection(text: string | null) {
@@ -163,5 +213,10 @@ export class Hud {
     vignette.classList.remove("flash"); void vignette.offsetWidth; vignette.classList.add("flash");
   }
 
-  destroy() { clearTimeout(this.bannerTimer); this.root.remove(); this.teammates.clear(); }
+  destroy() {
+    clearTimeout(this.bannerTimer);
+    document.body.classList.remove("is-downed", "is-out", "run-won", "run-lost");
+    this.root.remove();
+    this.teammates.clear();
+  }
 }
