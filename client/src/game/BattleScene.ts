@@ -33,6 +33,8 @@ const sy = (y: number) => y * DS;
 
 interface PlayerView {
   body: Phaser.GameObjects.Sprite;
+  /** Glowing hover ring under flying characters (strip id "<lineage>_hover"). */
+  hover?: Phaser.GameObjects.Sprite;
   oneShot: string;
   oneShotUntil: number;
   shadow: Phaser.GameObjects.Image;
@@ -647,6 +649,7 @@ export class BattleScene extends Phaser.Scene {
         view.body.setPosition(sx(view.dx), sy(view.dy));
         if (fx < -.04) view.body.setFlipX(true); else if (fx > .04) view.body.setFlipX(false);
         view.body.setScale(scale).setRotation(0);
+        this.syncHover(view, p.lineage, scale, alive, moving);
       } else {
       const scale = view.height / (artworkMetrics(key)?.bodyHeight ?? 220);
       view.body.setPosition(sx(view.dx) + fx * hitPose * 8, sy(view.dy) + fy * hitPose * 5 * DS - stepLift);
@@ -663,16 +666,41 @@ export class BattleScene extends Phaser.Scene {
         this.addAfterimage(view, LINEAGE_COLORS[p.lineage as LineageId]?.glowHex ?? 0xffffff);
         view.aura = .055;
       }
-      view.shadow.setPosition(sx(view.dx), sy(view.dy) + 1).setDisplaySize(view.height * .76, view.height * .24).setAlpha(p.life === "waiting" ? .25 : .84);
+      // A hovering body casts a smaller, softer shadow.
+      const flying = !!view.hover?.visible;
+      view.shadow.setPosition(sx(view.dx), sy(view.dy) + 1).setDisplaySize(view.height * (flying ? .5 : .76), view.height * (flying ? .15 : .24)).setAlpha(p.life === "waiting" ? .25 : flying ? .45 : .84);
       view.label.setText(p.name).setPosition(sx(view.dx), sy(view.dy) - view.height - 10).setDepth(95000);
       view.label.setVisible(!isMe || !alive);
     });
     for (const id of this.players.keys()) if (!seen.has(id)) this.removePlayer(id);
   }
 
+  /** Flying lineages ride on an animated energy ring drawn on the ground beneath them. */
+  private syncHover(view: PlayerView, lineage: string, scale: number, alive: boolean, moving: boolean) {
+    const id = `${lineage}_hover`;
+    if (!this.animLib.has(id)) {
+      view.hover?.setVisible(false);
+      return;
+    }
+    if (!view.hover) {
+      // Normal blending keeps the cyan visible on the pale station floor
+      // (additive glow washes out to white there).
+      view.hover = this.add.sprite(0, 0, "");
+      this.animLib.drive(view.hover, id, ["idle"]);
+    }
+    const h = view.hover;
+    // Downed flyers drop to the floor, so the ring fades out.
+    h.setVisible(alive);
+    h.setPosition(view.body.x, view.body.y);
+    h.setScale(scale * (moving ? 1.12 : 1), scale * (moving ? 0.92 : 1));
+    h.setAlpha(Math.min(1, view.body.alpha * (settings.reducedEffects ? 0.7 : 0.95)));
+    h.setDepth(view.body.depth - 0.5);
+  }
+
   private removePlayer(id: string) {
     const v = this.players.get(id);
     if (!v) return;
+    v.hover?.destroy();
     v.body.destroy();
     v.shadow.destroy();
     v.label.destroy();

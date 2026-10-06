@@ -137,7 +137,8 @@ After adding or replacing an original in `art-source/illustrated/`, run `npm run
 
 The game plays animation strips automatically when they are present:
 
-1. Copy the delivered strips and `animations.json` into `client/public/assets/animations/`. The repository ships an empty `animations.json` (`[]`).
+1. Copy the delivered strips into `client/public/assets/animations/` and **merge** their entries into the existing `animations.json`. Do not overwrite it: Pyra and Vektor strips are already installed.
+   - Flying characters may add a ground ring strip with id `<lineage>_hover` (animation `idle`, looped, same 256×256 frame and feet anchor). It plays automatically under the character and hides when the character is downed. Example: `fx_vektor_hover.png`.
 2. Each JSON entry needs `file`, `id` (`pyra_base`, `krios_glacier`, `enemy_pursuer`, `enemy_boss`, …), `animation`, `frames`, `frameWidth`, `frameHeight`, `fps`, `loop`, `anchorX` and `anchorY`.
 3. Run `npm run build`. Any form that has an `idle` strip switches from the single illustration to frame animation.
 

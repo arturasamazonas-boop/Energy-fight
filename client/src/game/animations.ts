@@ -120,7 +120,11 @@ export function stripScale(e: AnimEntry, displayHeight: number, referenceBody?: 
   return displayHeight / Math.max(16, body);
 }
 
-/** Highest opaque pixel of the first frame → body height above the feet anchor. */
+/**
+ * Opaque extent of the first frame: top-to-bottom height of the drawn body.
+ * Hovering characters leave air between the body and the feet anchor; that gap
+ * is not counted, so a flyer is sized like everyone else and still floats.
+ */
 function measureBody(scene: Phaser.Scene, e: AnimEntry): number | undefined {
   try {
     const src = scene.textures.get(sheetKey(e)).getSourceImage() as CanvasImageSource;
@@ -131,11 +135,15 @@ function measureBody(scene: Phaser.Scene, e: AnimEntry): number | undefined {
     if (!ctx) return undefined;
     ctx.drawImage(src, 0, 0, e.frameWidth, e.frameHeight, 0, 0, e.frameWidth, e.frameHeight);
     const data = ctx.getImageData(0, 0, e.frameWidth, e.frameHeight).data;
-    for (let y = 0; y < e.frameHeight; y++) {
-      for (let x = 0; x < e.frameWidth; x++) {
-        if (data[(y * e.frameWidth + x) * 4 + 3] > 40) return Math.max(16, e.anchorY - y);
-      }
-    }
+    const opaqueRow = (y: number) => {
+      for (let x = 0; x < e.frameWidth; x++) if (data[(y * e.frameWidth + x) * 4 + 3] > 40) return true;
+      return false;
+    };
+    let top = -1, bottom = -1;
+    for (let y = 0; y < e.frameHeight && top < 0; y++) if (opaqueRow(y)) top = y;
+    for (let y = e.frameHeight - 1; y >= 0 && bottom < 0; y--) if (opaqueRow(y)) bottom = y;
+    if (top < 0) return undefined;
+    return Math.max(16, Math.min(bottom, e.anchorY) - top);
   } catch {
     // Tainted or missing image: fall back to the frame estimate.
   }
