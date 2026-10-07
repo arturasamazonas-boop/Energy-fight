@@ -9,7 +9,7 @@ export const NET = {
   tickHz: 20,
   patchMs: 50,
   maxInputsPerSecond: 40,
-  maxActionsPerSecond: 12,
+  maxActionsPerSecond: 16, // tap combat: fast tapping plus jumps and skills
   reconnectSeconds: 90,
   maxPlayers: 8,
 } as const;
@@ -58,6 +58,15 @@ export const COMBAT = {
   chainBreakDamage: 0.1, // a hit for ≥10% max HP halves the chain
   chainMilestone: 10,
   lunge: { minRange: 120, maxRange: 280, windup: 0.42, speed: 620, duration: 0.36, cooldown: 4.5, damageMult: 1.4 },
+} as const;
+
+// BOTS-style controls: tap attacks, jump with real height, guard with parry, sprint.
+export const MOVES = {
+  jump: { velocity: 470, gravity: 1500, airControl: 0.9, avoidHeight: 22 },
+  slam: { fallSpeed: 950, radius: 92, damage: 1.4, stagger: 10, knockback: 26 },
+  guard: { reduction: 0.8, arcDeg: 115, meterMax: 100, drainPerHpPct: 2.5, regenPerSecond: 28, parryWindow: 0.16, parryStun: 1.2, breakStun: 1.0, moveMult: 0.35 },
+  run: { mult: 1.45, dashAttackDistance: 70 },
+  tap: { buffer: 0.35, holdIntervalMult: 1.5 },
 } as const;
 
 export const ACTIVITY = {

@@ -5,6 +5,7 @@ import {
   ACTIVITY,
   WARDEN,
   COMBAT,
+  MOVES,
   DAILY,
   type DailyMutator,
   type BossVariant,
@@ -48,7 +49,19 @@ export interface SimPlayer {
   downT: number;
   reviveProgress: number;
   connected: boolean;
-  input: { mx: number; my: number; atk: boolean };
+  input: { mx: number; my: number; atk: boolean; guard: boolean; run: boolean };
+  /** Height above the ground and vertical speed (jumping). */
+  z: number;
+  vz: number;
+  slam: boolean;
+  /** Guard: active flag, seconds since it was raised, meter, stun after a guard break. */
+  guarding: boolean;
+  guardT: number;
+  guardMeter: number;
+  stunT: number;
+  /** Buffered attack presses (tap combat). */
+  atkQueue: number;
+  atkQueueT: number;
   lastSeq: number;
   cds: { dodge: number; skill1: number; skill2: number };
   comboStep: number;
@@ -261,7 +274,16 @@ export class Sim {
       downT: 0,
       reviveProgress: 0,
       connected: true,
-      input: { mx: 0, my: 0, atk: false },
+      input: { mx: 0, my: 0, atk: false, guard: false, run: false },
+      z: 0,
+      vz: 0,
+      slam: false,
+      guarding: false,
+      guardT: 0,
+      guardMeter: MOVES.guard.meterMax,
+      stunT: 0,
+      atkQueue: 0,
+      atkQueueT: 0,
       lastSeq: 0,
       cds: { dodge: 0, skill1: 0, skill2: 0 },
       comboStep: 0,
@@ -306,13 +328,13 @@ export class Sim {
   }
 
   // ---- input -----------------------------------------------------------------
-  setInput(id: string, mx: number, my: number, atk: boolean, seq: number, fx?: number, fy?: number) {
+  setInput(id: string, mx: number, my: number, atk: boolean, seq: number, fx?: number, fy?: number, guard = false, run = false) {
     const p = this.players.get(id);
     if (!p || p.life === "departed") return;
     if (seq <= p.lastSeq) return; // stale or replayed
     p.lastSeq = seq;
     const n = normalizeInput(mx, my);
-    p.input = { mx: n.mx, my: n.my, atk };
+    p.input = { mx: n.mx, my: n.my, atk, guard, run };
     if (n.mx !== 0 || n.my !== 0) {
       const l = Math.hypot(n.mx, n.my);
       p.fx = n.mx / l;
@@ -326,7 +348,7 @@ export class Sim {
 
   clearInput(id: string) {
     const p = this.players.get(id);
-    if (p) p.input = { mx: 0, my: 0, atk: false };
+    if (p) p.input = { mx: 0, my: 0, atk: false, guard: false, run: false };
   }
 
   setConnected(id: string, connected: boolean) {
@@ -341,7 +363,7 @@ export class Sim {
     if (!p) return;
     p.life = "departed";
     p.connected = false;
-    p.input = { mx: 0, my: 0, atk: false };
+    p.input = { mx: 0, my: 0, atk: false, guard: false, run: false };
     p.pending = null;
     p.dash = null;
   }
@@ -356,6 +378,23 @@ export class Sim {
       p.fy = dy / dl;
     }
     const L = p.loadout;
+    if (a === "attack") {
+      // Tap combat: every press is buffered and becomes one swing.
+      if (p.stunT > 0) return false;
+      p.atkQueue = Math.min(2, p.atkQueue + 1);
+      p.atkQueueT = MOVES.tap.buffer;
+      return true;
+    }
+    if (a === "jump") {
+      if (p.z > 0 || p.stunT > 0 || p.dash || p.brace) return false;
+      p.vz = MOVES.jump.velocity;
+      p.z = 0.01;
+      p.guarding = false;
+      p.pending = null;
+      p.lock = 0;
+      this.fx.push({ t: "jump", id: p.id });
+      return true;
+    }
     if (a === "dodge") {
       if (p.cds.dodge > 0 || p.dash) return false;
       const dirx = dl > 0.3 ? dx / dl : p.input.mx || p.fx;
@@ -441,6 +480,7 @@ export class Sim {
     const L = p.loadout;
     const od = p.odT > 0 ? L.spec.overdrive : null;
     const cdRate = od ? od.cooldownRate : 1;
+    this.tickMoves(p);
     p.cds.dodge = Math.max(0, p.cds.dodge - DT);
     p.cds.skill1 = Math.max(0, p.cds.skill1 - DT * cdRate);
     p.cds.skill2 = Math.max(0, p.cds.skill2 - DT * cdRate);
@@ -485,8 +525,12 @@ export class Sim {
       if (d.t >= d.dur) p.dash = null;
     } else {
       let speed = L.moveSpeed * (od ? od.speedMult : 1);
-      if (p.pending || p.brace) speed *= 0.35;
-      else if (p.input.atk) speed *= 0.6;
+      if (p.stunT > 0) speed = 0;
+      else if (p.guarding) speed *= MOVES.guard.moveMult;
+      else if ((p.pending || p.brace) && p.z <= 0) speed *= 0.35;
+      else if (p.input.run) speed *= MOVES.run.mult;
+      else if (p.input.atk && p.z <= 0) speed *= 0.6;
+      if (p.z > 0) speed *= MOVES.jump.airControl;
       const m = stepMovement(p.x, p.y, p.input, speed, DT, this.maxX);
       p.x = m.x;
       p.y = m.y;
@@ -507,20 +551,75 @@ export class Sim {
         p.pending = null;
         this.resolvePlayerAttack(p, pend.spec, pend.kind, pend.step, pend.skill);
       }
-    } else if (p.input.atk && p.lock <= 0 && !p.dash && !p.brace) {
-      const step = p.comboStep;
+    } else if ((p.atkQueue > 0 || p.input.atk) && p.z > 0 && !p.slam && p.stunT <= 0) {
+      // Attack in the air: dive down and slam the ground.
+      p.atkQueue = 0;
+      p.slam = true;
+      p.vz = -MOVES.slam.fallSpeed;
+    } else if ((p.atkQueue > 0 || p.input.atk) && p.lock <= 0 && !p.dash && !p.brace && !p.guarding && p.stunT <= 0 && p.z <= 0) {
+      const tapped = p.atkQueue > 0;
+      if (tapped) p.atkQueue--;
+      // Sprinting into an attack turns it into a running strike (the combo finisher).
+      const running = p.input.run && p.moving && p.comboStep === 0;
+      const step = running ? 2 : p.comboStep;
       const spec = L.spec.combo.hits[step];
       this.assistAim(p, spec.range);
       if (this.enemyNear(p.x, p.y, spec.range + ACTIVITY.nearEnemyRange * 0.5)) this.useful(p);
       p.pending = { kind: "combo", t: 0.06, spec, step };
-      p.lock = L.spec.combo.interval[step];
-      p.comboStep = (step + 1) % 3;
+      // Holding only auto-attacks slowly; tapping in rhythm is the fast combo.
+      p.lock = L.spec.combo.interval[step] * (tapped ? 1 : MOVES.tap.holdIntervalMult);
+      if (running) {
+        p.dash = { t: 0, dur: 0.14, dx: p.fx, dy: p.fy, dist: MOVES.run.dashAttackDistance };
+        p.comboStep = 0;
+      } else p.comboStep = (step + 1) % 3;
       p.comboIdle = 0;
       this.fx.push({ t: "swing", id: p.id, x: p.x, y: p.y, ang: angleOf(p.fx, p.fy), range: spec.range, arc: spec.arcDeg ?? 90, lin: L.lineage, step });
     } else {
       p.comboIdle += DT;
       if (p.comboIdle > L.spec.combo.resetAfter) p.comboStep = 0;
     }
+  }
+
+  /** Jump physics, ground slam, guard meter and stun. */
+  private tickMoves(p: SimPlayer) {
+    p.stunT = Math.max(0, p.stunT - DT);
+    p.atkQueueT -= DT;
+    if (p.atkQueueT <= 0) p.atkQueue = 0;
+    if (p.z > 0 || p.vz > 0) {
+      p.vz -= MOVES.jump.gravity * DT;
+      p.z = Math.max(0, p.z + p.vz * DT);
+      if (p.z <= 0) {
+        p.z = 0;
+        p.vz = 0;
+        if (p.slam) {
+          p.slam = false;
+          p.lock = Math.max(p.lock, 0.25);
+          const S = MOVES.slam;
+          this.fx.push({ t: "slam", id: p.id, x: p.x, y: p.y, r: S.radius });
+          let hitAny = false;
+          for (const e of [...this.enemies.values()]) {
+            if (e.hp <= 0 || dist(p.x, p.y, e.x, e.y) > S.radius + e.spec.radius) continue;
+            this.damageEnemy(p, e, p.loadout.damage * S.damage, S.stagger, true, S.knockback, p.x, p.y);
+            hitAny = true;
+          }
+          if (hitAny) this.addChain(p, 2);
+        }
+      }
+    }
+    const wantGuard = p.input.guard && p.z <= 0 && p.stunT <= 0 && !p.dash && !p.brace;
+    if (wantGuard && !p.guarding) {
+      p.guarding = true;
+      p.guardT = 0;
+      p.pending = null;
+    } else if (!wantGuard) p.guarding = false;
+    if (p.guarding) p.guardT += DT;
+    else p.guardMeter = Math.min(MOVES.guard.meterMax, p.guardMeter + MOVES.guard.regenPerSecond * DT);
+  }
+
+  /** Is the hit coming from in front of a guarding player? */
+  private guardFaces(p: SimPlayer, fromX: number, fromY: number) {
+    const a = angleOf(fromX - p.x, fromY - p.y);
+    return angleDiff(a, angleOf(p.fx, p.fy)) <= (MOVES.guard.arcDeg / 2) * DEG;
   }
 
   private trackMovement(p: SimPlayer, moved: number) {
@@ -911,6 +1010,35 @@ export class Sim {
   private damagePlayer(p: SimPlayer, raw: number, src?: SimEnemy, srcKind = ""): boolean {
     if (p.life !== "alive") return false;
     if (this.opts.mutator === "glass") raw *= DAILY.glassTaken;
+    // Airborne players sail over ground attacks; projectiles still connect.
+    if (p.z > MOVES.jump.avoidHeight && srcKind !== "shot") return false;
+    if (p.guarding && (src ? this.guardFaces(p, src.x, src.y) : srcKind === "shot")) {
+      const G = MOVES.guard;
+      if (p.guardT <= G.parryWindow) {
+        // Perfect guard: no damage, attacker is stunned.
+        this.fx.push({ t: "guard", id: p.id, parry: true });
+        this.gainOd(p, OVERDRIVE.gainPerDefensive);
+        this.addChain(p, 2);
+        this.useful(p);
+        if (src && src.kind !== "boss") {
+          src.state = "flinch";
+          src.t = G.parryStun;
+          src.attack = null;
+          src.knock = { vx: Math.cos(angleOf(src.x - p.x, src.y - p.y)) * 260, vy: Math.sin(angleOf(src.x - p.x, src.y - p.y)) * 260, t: 0.15 };
+        } else if (src) src.stagger = Math.min(1, src.stagger + 0.15);
+        return false;
+      }
+      p.guardMeter -= (raw / p.maxHp) * 100 * G.drainPerHpPct;
+      if (p.guardMeter <= 0) {
+        p.guardMeter = 0;
+        p.guarding = false;
+        p.stunT = G.breakStun;
+        this.fx.push({ t: "guard", id: p.id, parry: false, broke: true });
+      } else {
+        this.fx.push({ t: "guard", id: p.id, parry: false });
+        raw *= 1 - G.reduction;
+      }
+    }
     if (p.iframes > 0) {
       // Accurately timed dodge.
       this.fx.push({ t: "perfect", id: p.id });
@@ -950,6 +1078,10 @@ export class Sim {
     this.gainOd(p, (dmg / p.maxHp) * 100 * OVERDRIVE.gainPerDamageTakenPct);
     if (p.hp <= 0) {
       p.life = "downed";
+      p.z = 0;
+      p.vz = 0;
+      p.slam = false;
+      p.guarding = false;
       p.downT = PLAYER.downedBleedSeconds;
       p.reviveProgress = 0;
       p.pending = null;
@@ -1628,6 +1760,7 @@ export class Sim {
 
   private dotAcc = new Map<string, number>();
   private damagePlayerTick(p: SimPlayer, amount: number) {
+    if (p.z > MOVES.jump.avoidHeight) return;
     const acc = (this.dotAcc.get(p.id) ?? 0) + amount;
     if (acc >= 1) {
       const whole = Math.floor(acc);

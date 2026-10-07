@@ -27,6 +27,7 @@ export function runBots(sim: Sim, opts: Record<string, BotOptions> = {}, maxSeco
         const d = botDecide(viewFor(sim, p.id), opts[p.id] ?? {}, sim.time);
         sim.setInput(p.id, d.mx, d.my, d.atk, seq++);
         if (d.action) sim.action(p.id, d.action.a, d.action.dx, d.action.dy);
+        else if (d.atk && i % 4 === 0) sim.action(p.id, "attack", 0, 0); // bots tap in rhythm
       }
     }
     sim.tick();

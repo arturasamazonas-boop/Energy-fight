@@ -2,14 +2,16 @@ import { LINEAGES, type LineageId } from "./config.ts";
 
 export const ROOM_NAME = "mission";
 
-export type ActionKind = "dodge" | "skill1" | "skill2" | "overdrive";
-export const ACTIONS: ActionKind[] = ["dodge", "skill1", "skill2", "overdrive"];
+export type ActionKind = "dodge" | "skill1" | "skill2" | "overdrive" | "jump" | "attack";
+export const ACTIONS: ActionKind[] = ["dodge", "skill1", "skill2", "overdrive", "jump", "attack"];
 
 export interface InputMsg {
   seq: number;
   mx: number;
   my: number;
   atk: boolean;
+  guard?: boolean; // holding guard
+  run?: boolean; // sprinting (double-tap or stick pushed to the edge)
   fx?: number; // facing hint (unit vector) used when standing still
   fy?: number;
 }
@@ -31,6 +33,14 @@ export function parseInput(m: unknown): InputMsg | null {
   if (!isNum(o.mx, -1.01, 1.01) || !isNum(o.my, -1.01, 1.01)) return null;
   if (typeof o.atk !== "boolean") return null;
   const out: InputMsg = { seq: o.seq as number, mx: o.mx as number, my: o.my as number, atk: o.atk };
+  if (o.guard !== undefined) {
+    if (typeof o.guard !== "boolean") return null;
+    out.guard = o.guard;
+  }
+  if (o.run !== undefined) {
+    if (typeof o.run !== "boolean") return null;
+    out.run = o.run;
+  }
   if (o.fx !== undefined || o.fy !== undefined) {
     if (!isNum(o.fx, -1.01, 1.01) || !isNum(o.fy, -1.01, 1.01)) return null;
     out.fx = o.fx as number;
@@ -65,6 +75,9 @@ export type FxEvent =
   | { t: "perfect"; id: string }
   | { t: "od"; id: string; lin: string }
   | { t: "chain"; id: string; n: number }
+  | { t: "jump"; id: string }
+  | { t: "slam"; id: string; x: number; y: number; r: number }
+  | { t: "guard"; id: string; parry: boolean; broke?: boolean }
   | { t: "section"; id: number }
   | { t: "msg"; key: string };
 

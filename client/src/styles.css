@@ -353,10 +353,12 @@ body.in-game #stage { display: block; }
 .cbtn i { position: absolute; inset: 0; z-index: 1; background: conic-gradient(#000b calc(var(--cd, 0) * 360deg), transparent 0); }
 .cbtn.atk { right: 0; bottom: 0; width: 92px; height: 92px; font-size: 30px; border-width: 3px; }
 .cbtn.atk.held { background: color-mix(in srgb, var(--lin) 35%, #0f1720); }
-.cbtn.dodge { right: 104px; bottom: 0; }
-.cbtn.s1 { right: 96px; bottom: 74px; }
-.cbtn.s2 { right: 24px; bottom: 106px; }
-.cbtn.od { right: 128px; bottom: 150px; width: 56px; height: 56px; opacity: .35; font-size: 15px; }
+.cbtn.jump { right: 104px; bottom: 0; }
+.cbtn.guard { right: 14px; bottom: 104px; }
+.cbtn.s1 { right: 96px; bottom: 76px; }
+.cbtn.s2 { right: 176px; bottom: 40px; }
+.cbtn.od { right: 168px; bottom: 112px; width: 56px; height: 56px; opacity: .35; font-size: 15px; }
+.cbtn.guard.held { background: color-mix(in srgb, #9fe8ff 30%, #0f1720); box-shadow: 0 0 16px #9fe8ff88; }
 .cbtn.od.ready { opacity: 1; box-shadow: 0 0 14px var(--lin); }
 .cbtn.disabled { filter: grayscale(.8); }
 .cbtn.gone { display: none; }

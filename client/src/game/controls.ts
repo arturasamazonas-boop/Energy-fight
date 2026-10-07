@@ -10,12 +10,21 @@ export interface ControlState {
   mx: number;
   my: number;
   atk: boolean;
+  guard: boolean;
+  run: boolean;
 }
+
+const DOUBLE_TAP_MS = 300;
 
 const STICK_RADIUS = 56;
 
 export class Controls {
-  state: ControlState = { mx: 0, my: 0, atk: false };
+  state: ControlState = { mx: 0, my: 0, atk: false, guard: false, run: false };
+  private guardPointers = new Set<number>();
+  private lastStickRelease = 0;
+  private stickRun = false;
+  private lastDirKey = { key: "", at: 0 };
+  private keyRun = false;
   onAction: (a: ActionKind) => void = () => {};
   readonly root: HTMLElement;
   private stickPointer: number | null = null;
@@ -40,8 +49,9 @@ export class Controls {
         <button class="cbtn od" data-a="overdrive" aria-label="${t("ctl_overdrive")}"><span>${actionGlyph("overdrive")}</span><kbd class="action-key">R</kbd><i></i></button>
         <button class="cbtn s2" data-a="skill2" aria-label="${t("ctl_skill2")}"><span>${actionGlyph("skill2")}</span><kbd class="action-key">E</kbd><b class="action-index">2</b><i></i></button>
         <button class="cbtn s1" data-a="skill1" aria-label="${t("ctl_skill1")}"><span>${actionGlyph("skill1")}</span><kbd class="action-key">Q</kbd><b class="action-index">1</b><i></i></button>
-        <button class="cbtn dodge" data-a="dodge" aria-label="${t("ctl_dodge")}"><span>${actionGlyph("dodge")}</span><kbd class="action-key">⇧</kbd><i></i></button>
-        <button class="cbtn atk" data-a="attack" aria-label="${t("ctl_attack")}"><span>${actionGlyph("attack")}</span><kbd class="action-key">J</kbd></button>
+        <button class="cbtn guard" data-a="guard" aria-label="${t("ctl_guard")}"><span>${actionGlyph("guard")}</span><kbd class="action-key">X</kbd><i></i></button>
+        <button class="cbtn jump" data-a="jump" aria-label="${t("ctl_jump")}"><span>${actionGlyph("jump")}</span><kbd class="action-key">C</kbd><i></i></button>
+        <button class="cbtn atk" data-a="attack" aria-label="${t("ctl_attack")}"><span>${actionGlyph("attack")}</span><kbd class="action-key">Z</kbd></button>
       </div>
       <div class="keys-help">${t("keys_help")}</div>`;
     parent.appendChild(this.root);
@@ -59,6 +69,9 @@ export class Controls {
       e.preventDefault();
       zone.setPointerCapture(e.pointerId);
       this.stickPointer = e.pointerId;
+      // Touch the stick again right after letting go = sprint while held (BOTS double-tap run).
+      this.stickRun = performance.now() - this.lastStickRelease < DOUBLE_TAP_MS;
+      this.refreshRun();
       this.stickOrigin = { x: e.clientX, y: e.clientY };
       this.stickBase.style.left = `${e.clientX}px`;
       this.stickBase.style.top = `${e.clientY}px`;
@@ -85,6 +98,7 @@ export class Controls {
       e.preventDefault();
       atk.setPointerCapture(e.pointerId);
       this.atkPointers.add(e.pointerId);
+      this.onAction("attack");
       this.refreshAtk();
     });
     const endAtk = (e: PointerEvent) => {
@@ -95,7 +109,23 @@ export class Controls {
     this.listen(atk, "pointercancel", endAtk);
     this.listen(atk, "lostpointercapture", endAtk);
 
-    for (const a of ["dodge", "skill1", "skill2", "overdrive"] as ActionKind[]) {
+    const guard = this.buttons.guard;
+    this.listen(guard, "pointerdown", (e: PointerEvent) => {
+      unlockAudio();
+      e.preventDefault();
+      guard.setPointerCapture(e.pointerId);
+      this.guardPointers.add(e.pointerId);
+      this.refreshGuard();
+    });
+    const endGuard = (e: PointerEvent) => {
+      this.guardPointers.delete(e.pointerId);
+      this.refreshGuard();
+    };
+    this.listen(guard, "pointerup", endGuard);
+    this.listen(guard, "pointercancel", endGuard);
+    this.listen(guard, "lostpointercapture", endGuard);
+
+    for (const a of ["jump", "skill1", "skill2", "overdrive"] as ActionKind[]) {
       this.listen(this.buttons[a], "pointerdown", (e: PointerEvent) => {
         unlockAudio();
         e.preventDefault();
@@ -140,12 +170,24 @@ export class Controls {
 
   private releaseStick() {
     this.stickPointer = null;
+    this.lastStickRelease = performance.now();
+    this.stickRun = false;
+    this.refreshRun();
     this.stickBase.classList.add("hidden");
     this.root.classList.remove("stick-active");
     this.stickKnob.style.transform = "";
     this.state.mx = 0;
     this.state.my = 0;
     this.applyKeys();
+  }
+
+  private refreshGuard() {
+    this.state.guard = this.guardPointers.size > 0 || this.keys.has("guard");
+    this.buttons.guard.classList.toggle("held", this.state.guard);
+  }
+
+  private refreshRun() {
+    this.state.run = this.stickRun || this.keyRun || this.keys.has("run");
   }
 
   private refreshAtk() {
@@ -158,15 +200,27 @@ export class Controls {
     const k = e.key.toLowerCase();
     const map: Record<string, string> = {
       w: "up", arrowup: "up", s: "down", arrowdown: "down", a: "left", arrowleft: "left", d: "right", arrowright: "right",
-      " ": "atk", j: "atk",
+      " ": "atk", j: "atk", z: "atk", x: "guard", l: "guard", shift: "run",
     };
-    const act: Record<string, ActionKind> = { shift: "dodge", k: "dodge", q: "skill1", u: "skill1", e: "skill2", i: "skill2", r: "overdrive", o: "overdrive" };
+    const act: Record<string, ActionKind> = { c: "jump", k: "jump", q: "skill1", u: "skill1", e: "skill2", i: "skill2", r: "overdrive", o: "overdrive", v: "overdrive" };
     if (map[k]) {
       e.preventDefault();
-      if (down) this.keys.add(map[k]);
-      else this.keys.delete(map[k]);
-      if (map[k] === "atk") this.refreshAtk();
+      const name = map[k];
+      if (down && !e.repeat && ["up", "down", "left", "right"].includes(name)) {
+        // Double-tap a direction and hold it to run.
+        const now = performance.now();
+        this.keyRun = this.lastDirKey.key === name && now - this.lastDirKey.at < DOUBLE_TAP_MS;
+        this.lastDirKey = { key: name, at: now };
+      }
+      if (down) this.keys.add(name);
+      else this.keys.delete(name);
+      if (!["up", "down", "left", "right"].some((d) => this.keys.has(d))) this.keyRun = false;
+      if (name === "atk") {
+        if (down && !e.repeat) this.onAction("attack");
+        this.refreshAtk();
+      } else if (name === "guard") this.refreshGuard();
       else this.applyKeys();
+      this.refreshRun();
       unlockAudio();
     } else if (act[k] && down && !e.repeat) {
       e.preventDefault();
@@ -192,9 +246,12 @@ export class Controls {
   releaseAll() {
     this.keys.clear();
     this.atkPointers.clear();
+    this.guardPointers.clear();
+    this.keyRun = false;
     if (this.stickPointer !== null) this.releaseStick();
-    this.state = { mx: 0, my: 0, atk: false };
+    this.state = { mx: 0, my: 0, atk: false, guard: false, run: false };
     this.buttons.attack.classList.remove("held");
+    this.buttons.guard?.classList.remove("held");
   }
 
   setButton(a: string, opts: { ratio: number; enabled: boolean; ready?: boolean; visible?: boolean }) {

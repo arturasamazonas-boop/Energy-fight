@@ -286,7 +286,7 @@ export class GameRoom extends Room {
     seat.inputBudget--;
     const msg = parseInput(m);
     if (!msg) return void seat.rejected++;
-    this.sim.setInput(client.sessionId, msg.mx, msg.my, msg.atk, msg.seq, msg.fx, msg.fy);
+    this.sim.setInput(client.sessionId, msg.mx, msg.my, msg.atk, msg.seq, msg.fx, msg.fy, msg.guard ?? false, msg.run ?? false);
   }
 
   private onAction(client: Client, m: unknown) {
@@ -543,7 +543,9 @@ export class GameRoom extends Room {
       p.cdDodge = sp.cds.dodge;
       p.cdS1 = sp.cds.skill1;
       p.cdS2 = sp.cds.skill2;
-      p.act = sp.dash ? "dash" : sp.brace ? "brace" : sp.pending ? "windup" : "";
+      p.act = sp.stunT > 0 ? "stun" : sp.slam ? "slam" : sp.guarding ? "guard" : sp.dash ? "dash" : sp.brace ? "brace" : sp.pending ? "windup" : sp.input.run && sp.moving ? "run" : "";
+      p.z = sp.z;
+      p.guardMeter = Math.round(sp.guardMeter);
       p.combo = sp.comboStep;
       p.chain = Math.min(65535, sp.chain);
       p.ack = sp.lastSeq;

@@ -78,7 +78,7 @@ export function botDecide(v: BotView, opts: BotOptions = {}, t = 0): BotDecision
       const ty = s.y - threat.y;
       const tl = Math.hypot(tx, ty) || 1;
       if (threat.kind === "boss" && Math.hypot(tx, ty) > 120) return { mx: tx / tl, my: ty / tl, atk: false };
-      return { mx: tx / tl, my: ty / tl, atk: false, action: { a: "dodge", dx: tx / tl, dy: ty / tl } };
+      return { mx: tx / tl, my: ty / tl, atk: false, action: { a: "jump", dx: tx / tl, dy: ty / tl } };
     }
     if (nd < 160) {
       if (s.od >= 100 && v.hasOverdrive) dec.action = { a: "overdrive", dx, dy };

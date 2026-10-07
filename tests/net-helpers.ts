@@ -88,6 +88,7 @@ export class NetBot {
     try {
       this.room.send("input", { seq: this.seq++, mx: d.mx, my: d.my, atk: d.atk });
       if (d.action) this.room.send("action", { seq: this.seq++, a: d.action.a, dx: d.action.dx, dy: d.action.dy });
+      else if (d.atk && this.seq % 4 === 0) this.room.send("action", { seq: this.seq++, a: "attack", dx: 0, dy: 0 });
     } catch {}
   }
   /** Simulates an abrupt network loss (not a consented leave). */

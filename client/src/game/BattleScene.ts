@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import type { Room } from "@colyseus/sdk";
 import {
   COMBAT,
+  MOVES,
   LINEAGE_SPECS,
   MAP,
   OVERDRIVE,
@@ -47,6 +48,8 @@ interface PlayerView {
   hitFlash: number;
   /** Screen-space y of the top of the head (for bars and names). */
   headY?: number;
+  /** Smoothed jump height (screen px). */
+  z?: number;
   /** Health shown on the bar; trails the real value so hits read as a white chunk. */
   hpShown?: number;
   aura: number;
@@ -91,11 +94,14 @@ export class BattleScene extends Phaser.Scene {
   private numbers: { txt: Phaser.GameObjects.Text; life: number; vy: number }[] = [];
   private numberPool: Phaser.GameObjects.Text[] = [];
   private seq = 1;
-  private lastSent = { mx: 0, my: 0, atk: false, at: 0 };
+  private lastSent = { mx: 0, my: 0, atk: false, guard: false, run: false, at: 0 };
+  /** Predicted jump height for our own hero (server z drives everyone else). */
+  private predZ = 0;
+  private predVz = 0;
   private pred = { x: 0, y: 0, init: false, dash: null as null | { dx: number; dy: number; t: number; dur: number; dist: number } };
   private history: { seq: number; x: number; y: number }[] = [];
   private corr = { x: 0, y: 0 };
-  private localSwing = { timer: 0, step: 0, idle: 0 };
+  private localSwing = { timer: 0, step: 0, idle: 0, queue: 0, queueT: 0 };
   private facing = { x: 1, y: 0 };
   private shakeCooldown = 0;
   private hitStop = 0;
@@ -508,6 +514,22 @@ export class BattleScene extends Phaser.Scene {
       dy = this.facing.y;
     }
     this.room.send("action", { seq: this.seq++, a, dx: clamp1(dx), dy: clamp1(dy) });
+    if (a === "attack") {
+      if (me.act !== "stun") {
+        this.localSwing.queue = Math.min(2, this.localSwing.queue + 1);
+        this.localSwing.queueT = MOVES.tap.buffer;
+      }
+      return;
+    }
+    if (a === "jump") {
+      if (this.predZ <= 0 && me.act !== "stun") {
+        this.predVz = MOVES.jump.velocity;
+        this.predZ = 0.01;
+        sfx("dodge");
+        this.playOneShot(this.room.sessionId, "jump_start", 180);
+      }
+      return;
+    }
     if (a === "dodge" && me.cdDodge <= 0) {
       const l = Math.hypot(dx, dy) || 1;
       this.pred.dash = { dx: dx / l, dy: dy / l, t: 0, dur: PLAYER.dodgeDuration, dist: PLAYER.dodgeDistance };
@@ -526,14 +548,14 @@ export class BattleScene extends Phaser.Scene {
   private sendInput(now: number) {
     const s = this.controls.state;
     const n = normalizeInput(s.mx, s.my);
-    const changed = Math.abs(n.mx - this.lastSent.mx) > 0.05 || Math.abs(n.my - this.lastSent.my) > 0.05 || s.atk !== this.lastSent.atk;
+    const changed = Math.abs(n.mx - this.lastSent.mx) > 0.05 || Math.abs(n.my - this.lastSent.my) > 0.05 || s.atk !== this.lastSent.atk || s.guard !== this.lastSent.guard || s.run !== this.lastSent.run;
     if (!changed && now - this.lastSent.at < 50) return;
-    if (!changed && now - this.lastSent.at < 100 && n.mx === 0 && n.my === 0 && !s.atk) return;
+    if (!changed && now - this.lastSent.at < 100 && n.mx === 0 && n.my === 0 && !s.atk && !s.guard) return;
     const seq = this.seq++;
-    this.room.send("input", { seq, mx: round3(n.mx), my: round3(n.my), atk: s.atk, fx: round3(this.facing.x), fy: round3(this.facing.y) });
+    this.room.send("input", { seq, mx: round3(n.mx), my: round3(n.my), atk: s.atk, guard: s.guard, run: s.run, fx: round3(this.facing.x), fy: round3(this.facing.y) });
     this.history.push({ seq, x: this.pred.x, y: this.pred.y });
     if (this.history.length > 120) this.history.shift();
-    this.lastSent = { mx: n.mx, my: n.my, atk: s.atk, at: now };
+    this.lastSent = { mx: n.mx, my: n.my, atk: s.atk, guard: s.guard, run: s.run, at: now };
   }
 
   // ---- main loop --------------------------------------------------------------------
@@ -563,7 +585,9 @@ export class BattleScene extends Phaser.Scene {
         this.pred.y = me.y;
         this.pred.dash = null;
         this.history = [];
-        if (this.lastSent.atk || this.lastSent.mx || this.lastSent.my) this.sendInput(now);
+        this.predZ = 0;
+        this.predVz = 0;
+        if (this.lastSent.atk || this.lastSent.mx || this.lastSent.my || this.lastSent.guard) this.sendInput(now);
       }
     }
 
@@ -590,8 +614,23 @@ export class BattleScene extends Phaser.Scene {
     }
     const lin = LINEAGE_SPECS[me.lineage as LineageId] ?? LINEAGE_SPECS.pyra;
     let speed = PLAYER.moveSpeed * lin.speedMult * (me.odT > 0 ? lin.overdrive.speedMult : 1);
-    if (me.act === "windup" || me.act === "brace") speed *= 0.35;
-    else if (this.controls.state.atk) speed *= 0.6;
+    const cs = this.controls.state;
+    if (me.act === "stun") speed = 0;
+    else if (cs.guard && this.predZ <= 0) speed *= MOVES.guard.moveMult;
+    else if ((me.act === "windup" || me.act === "brace") && this.predZ <= 0) speed *= 0.35;
+    else if (cs.run) speed *= MOVES.run.mult;
+    else if (cs.atk && this.predZ <= 0) speed *= 0.6;
+    if (this.predZ > 0) speed *= MOVES.jump.airControl;
+    // Jump arc (mirrors the server's gravity).
+    if (this.predZ > 0 || this.predVz > 0) {
+      this.predVz -= MOVES.jump.gravity * dt;
+      this.predZ = Math.max(0, this.predZ + this.predVz * dt);
+      if (this.predZ <= 0) {
+        this.predVz = 0;
+        sfx("hit");
+      }
+    }
+    if (me.act === "slam" && this.predVz > -MOVES.slam.fallSpeed) this.predVz = -MOVES.slam.fallSpeed;
     const maxX = this.room.state.maxX || MAP.width;
     if (this.pred.dash) {
       const d = this.pred.dash;
@@ -642,16 +681,28 @@ export class BattleScene extends Phaser.Scene {
     const lin = LINEAGE_SPECS[me.lineage as LineageId] ?? LINEAGE_SPECS.pyra;
     const L = this.localSwing;
     L.timer -= dt;
-    if (this.controls.state.atk) {
+    L.queueT -= dt;
+    if (L.queueT <= 0) L.queue = 0;
+    const cs = this.controls.state;
+    if (this.predZ > 0 && L.queue > 0) {
+      // Air attack: the server turns it into a ground slam.
+      L.queue = 0;
+      this.playOneShot(this.room.sessionId, "air_attack", 300);
+      return;
+    }
+    const wants = L.queue > 0 || cs.atk;
+    if (wants && !cs.guard && this.predZ <= 0 && me.act !== "stun") {
       L.idle = 0;
       if (L.timer <= 0 && !this.pred.dash) {
+        const tapped = L.queue > 0;
+        if (tapped) L.queue--;
         const spec = lin.combo.hits[L.step];
         this.swingFx(this.pred.x, this.pred.y, Math.atan2(this.facing.y, this.facing.x), spec.range, spec.arcDeg ?? 90, me.lineage, L.step, characterDisplayHeight(me.lineage, me.level, me.evolution) * .48);
         const v = this.players.get(this.room.sessionId);
         if (v) v.lunge = 1;
         this.playOneShot(this.room.sessionId, `attack${L.step + 1}`, 380);
         sfx("swing");
-        L.timer = lin.combo.interval[L.step];
+        L.timer = lin.combo.interval[L.step] * (tapped ? 1 : MOVES.tap.holdIntervalMult);
         L.step = (L.step + 1) % 3;
       }
     } else {
@@ -704,13 +755,22 @@ export class BattleScene extends Phaser.Scene {
       const breath = settings.reducedMotion || !alive ? 0 : Math.sin(view.gait) * .012;
       const stepLift = Math.abs(Math.sin(view.gait)) * motion * 2;
       const hitPose = Math.sin(view.lunge * Math.PI);
+      const targetZ = isMe ? this.predZ : p.z ?? 0;
+      view.z = isMe ? targetZ : (view.z ?? 0) + (targetZ - (view.z ?? 0)) * Math.min(1, dt * 18);
       if (animated) {
         // Frame animation strips: pick the animation from the gameplay state.
         const now = performance.now();
-        const wanted = !alive ? ["downed"] : p.act === "dash" ? ["dodge", "run"] : view.oneShotUntil > now ? [view.oneShot, "attack1", "idle"] : moving ? ["run", "idle"] : ["idle"];
+        const airborne = (view.z ?? 0) > 2;
+        const wanted = !alive ? ["downed"]
+          : p.act === "stun" ? ["hurt", "idle"]
+          : airborne ? (p.act === "slam" ? ["air_attack", "attack3"] : view.oneShotUntil > now ? [view.oneShot, "jump_air", "idle"] : ["jump_air", "jump_start", "idle"])
+          : p.act === "guard" ? (view.oneShotUntil > now ? [view.oneShot, "guard", "idle"] : ["guard", "idle"])
+          : p.act === "dash" ? ["dash_attack", "dodge", "run"]
+          : view.oneShotUntil > now ? [view.oneShot, "attack1", "idle"]
+          : moving ? (p.act === "run" ? ["sprint", "run", "idle"] : ["run", "idle"]) : ["idle"];
         const entry = this.animLib.drive(view.body, formId, wanted);
         const scale = entry ? stripScale(entry, view.height, this.animLib.referenceHeight(formId)) : 1;
-        view.body.setPosition(sx(view.dx), sy(view.dy));
+        view.body.setPosition(sx(view.dx), sy(view.dy) - (view.z ?? 0));
         if (fx < -.04) view.body.setFlipX(true); else if (fx > .04) view.body.setFlipX(false);
         view.body.setScale(scale).setRotation(0);
         this.syncHover(view, p.lineage, scale, alive, moving);
@@ -718,7 +778,7 @@ export class BattleScene extends Phaser.Scene {
         view.headY = topPx ? view.body.y - topPx * scale : undefined;
       } else {
       const scale = view.height / (artworkMetrics(key)?.bodyHeight ?? 220);
-      view.body.setPosition(sx(view.dx) + fx * hitPose * 8, sy(view.dy) + fy * hitPose * 5 * DS - stepLift);
+      view.body.setPosition(sx(view.dx) + fx * hitPose * 8, sy(view.dy) + fy * hitPose * 5 * DS - stepLift - (view.z ?? 0));
       if (fx < -.04) view.body.setFlipX(true); else if (fx > .04) view.body.setFlipX(false);
       view.body.setScale(scale * (1 - breath * .35 + hitPose * .055), scale * (1 + breath - hitPose * .02));
       const direction = view.body.flipX ? -1 : 1;
@@ -734,7 +794,8 @@ export class BattleScene extends Phaser.Scene {
       }
       // A hovering body casts a smaller, softer shadow.
       const flying = !!view.hover?.visible;
-      view.shadow.setPosition(sx(view.dx), sy(view.dy) + 1).setDisplaySize(view.height * (flying ? .5 : .76), view.height * (flying ? .15 : .24)).setAlpha(p.life === "waiting" ? .25 : flying ? .45 : .84);
+      const lift = Math.max(.45, 1 - (view.z ?? 0) / 160);
+      view.shadow.setPosition(sx(view.dx), sy(view.dy) + 1).setDisplaySize(view.height * (flying ? .5 : .76) * lift, view.height * (flying ? .15 : .24) * lift).setAlpha((p.life === "waiting" ? .25 : flying ? .45 : .84) * (0.6 + 0.4 * lift));
       if (!animated) view.headY = undefined;
       const head = view.headY ?? sy(view.dy) - view.height;
       view.label.setText(p.name).setPosition(sx(view.dx), head - 13).setDepth(95000);
@@ -759,7 +820,7 @@ export class BattleScene extends Phaser.Scene {
     const h = view.hover;
     // Downed flyers drop to the floor, so the ring fades out.
     h.setVisible(alive);
-    h.setPosition(view.body.x, view.body.y);
+    h.setPosition(view.body.x, view.body.y + (view.z ?? 0));
     h.setScale(scale * (moving ? 1.12 : 1), scale * (moving ? 0.92 : 1));
     h.setAlpha(Math.min(1, view.body.alpha * (settings.reducedEffects ? 0.7 : 0.95)));
     h.setDepth(view.body.depth - 0.5);
@@ -1078,6 +1139,22 @@ export class BattleScene extends Phaser.Scene {
         g.lineStyle(3, LINEAGE_COLORS[p.lineage as LineageId]?.glowHex ?? 0xffffff, 0.5 + 0.3 * Math.sin(performance.now() / 80));
         g.strokeEllipse(x, y, 70, 70 * DS);
       }
+      if (p.act === "guard") {
+        // Guard: a glowing barrier arc on the side the hero faces.
+        const fxv = id === this.room.sessionId ? this.facing.x : p.fx, fyv = id === this.room.sessionId ? this.facing.y : p.fy;
+        const ang = Math.atan2(fyv * DS, fxv);
+        const meter = (p.guardMeter ?? 100) / MOVES.guard.meterMax;
+        const col = meter > 0.35 ? (LINEAGE_COLORS[p.lineage as LineageId]?.glowHex ?? 0x9fe8ff) : 0xff6b6b;
+        const cy = y - v.height * 0.45;
+        g.lineStyle(5, col, 0.35 + 0.5 * meter);
+        g.beginPath();
+        g.arc(x, cy, v.height * 0.62, ang - 0.95, ang + 0.95, false);
+        g.strokePath();
+        g.lineStyle(2, 0xffffff, 0.6 * meter);
+        g.beginPath();
+        g.arc(x, cy, v.height * 0.66, ang - 0.7, ang + 0.7, false);
+        g.strokePath();
+      }
       if (p.act === "brace") {
         g.lineStyle(4, 0xe0b85a, 0.9);
         g.strokeEllipse(x, y - 30, 64, 80);
@@ -1217,7 +1294,8 @@ export class BattleScene extends Phaser.Scene {
       const chainLeft = 1 - (performance.now() - this.chainAt) / (COMBAT.chainWindow * 1000);
       this.hud.chain(me.life === "alive" ? me.chain : 0, Math.round(Math.min(COMBAT.chainMaxBonus, me.chain * COMBAT.chainPerHit) * 100), chainLeft);
       const alive = me.life === "alive";
-      this.controls.setButton("dodge", { ratio: me.cdDodge / PLAYER.dodgeCooldown, enabled: alive });
+      this.controls.setButton("jump", { ratio: 0, enabled: alive && me.act !== "stun" });
+      this.controls.setButton("guard", { ratio: 1 - (me.guardMeter ?? 100) / MOVES.guard.meterMax, enabled: alive && me.act !== "stun" });
       this.controls.setButton("skill1", { ratio: me.cdS1 / Math.max(0.1, me.maxS1), enabled: alive });
       this.controls.setButton("skill2", { ratio: me.cdS2 / Math.max(0.1, me.maxS2), enabled: alive && me.hasSkill2, visible: me.hasSkill2 });
       this.controls.setButton("overdrive", { ratio: 1 - me.od / OVERDRIVE.max, enabled: alive && me.od >= OVERDRIVE.max, ready: me.od >= OVERDRIVE.max || me.odT > 0, visible: me.hasOverdrive });
@@ -1470,6 +1548,52 @@ export class BattleScene extends Phaser.Scene {
           this.hud.banner("✦", 500);
         }
         break;
+      case "jump":
+        if (f.id !== myId) this.playOneShot(f.id, "jump_start", 180);
+        break;
+      case "slam": {
+        sfx("skill");
+        if (!settings.reducedMotion && (f.id === myId || this.shakeCooldown <= 0)) {
+          this.cameras.main.shake(140, f.id === myId ? 0.008 : 0.004);
+          this.shakeCooldown = 0.15;
+        }
+        const sxp = sx(f.x), syp = sy(f.y);
+        this.addTransient(.38, (graphics, progress) => {
+          const fade = 1 - progress;
+          graphics.lineStyle(5 * fade, 0xfff1c9, fade);
+          graphics.strokeEllipse(sxp, syp, f.r * 2 * (0.4 + progress), f.r * 2 * (0.4 + progress) * DS);
+          graphics.fillStyle(0xffffff, 0.25 * fade);
+          graphics.fillEllipse(sxp, syp, f.r * 1.4 * (0.3 + progress), f.r * 1.4 * (0.3 + progress) * DS);
+        });
+        break;
+      }
+      case "guard": {
+        const v = this.players.get(f.id);
+        if (f.parry) {
+          sfx("perfect");
+          this.playOneShot(f.id, "parry", 330);
+          if (f.id === myId) {
+            this.hud.banner(t("parry"), 900);
+            if (!settings.reducedMotion) this.cameras.main.flash(120, 210, 245, 255);
+          }
+        } else if (f.broke) {
+          sfx("hurt");
+          if (f.id === myId) this.hud.banner(t("guard_break"), 1000);
+        } else {
+          sfx("hit");
+          this.playOneShot(f.id, "guard_impact", 200, false);
+        }
+        if (v) {
+          const px = sx(v.dx), py = sy(v.dy) - v.height * 0.45 - (v.z ?? 0);
+          const col = f.parry ? 0xffffff : f.broke ? 0xff6b6b : 0x9fe8ff;
+          this.addTransient(f.parry ? .35 : .2, (graphics, progress) => {
+            const fade = 1 - progress;
+            graphics.lineStyle(f.parry ? 6 * fade : 3 * fade, col, fade);
+            graphics.strokeCircle(px, py, 18 + progress * (f.parry ? 60 : 30));
+          });
+        }
+        break;
+      }
       case "chain":
         if (f.id === myId) {
           this.hud.banner(t("combo_milestone", { n: f.n }), 1200);

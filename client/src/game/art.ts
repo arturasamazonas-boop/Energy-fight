@@ -108,6 +108,8 @@ export function actionGlyph(action: string, lineage: LineageId = "pyra") {
   const shape: Record<string, string> = {
     attack: '<path d="m10 35 19-24 9-3-2 9-21 23-7 2 2-7Z"/><path d="m12 32 8 7M26 15l7 6M8 42l7-7"/>',
     dodge: '<path d="M8 30c5-12 11-16 26-15M27 8l10 7-8 9M6 37h13M10 42h8"/>',
+    jump: '<path d="M24 40V12M14 21l10-10 10 10"/><path d="M10 42c6-4 22-4 28 0"/>',
+    guard: '<path d="M24 5 39 11v12c0 10-7 17-15 20C16 40 9 33 9 23V11l15-6Z"/><path d="M24 12v24M16 20h16"/>',
     overdrive: '<path d="m27 5-15 22h11l-2 16 15-23H25l2-15Z"/><path d="M10 15 7 20M37 29l-3 5"/>',
     pyra: '<path d="M26 5c3 12 13 14 11 26-1 9-7 12-13 12S11 38 11 30c0-6 5-11 6-15 1 6 4 7 5 9 4-6 5-12 4-19Z"/><path d="M25 27c0 4-5 6-5 10s6 6 8 1c2-4-2-6-3-11Z"/>',
     krios: '<path d="m24 5 13 19-13 19L11 24 24 5Zm0 0v38M11 24h26M16 12l8 12 8-12M16 36l8-12 8 12"/>',

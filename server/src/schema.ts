@@ -28,7 +28,9 @@ export class PlayerS extends Schema {
   @type("float32") maxS2 = 1;
   @type("boolean") hasSkill2 = false;
   @type("boolean") hasOverdrive = false;
-  @type("string") act = ""; // "", "windup", "dash", "brace"
+  @type("string") act = ""; // "", "windup", "dash", "brace", "guard", "slam", "stun", "run"
+  @type("float32") z = 0; // jump height
+  @type("uint8") guardMeter = 100;
   @type("uint8") combo = 0;
   @type("uint16") chain = 0; // landed-hit chain (combo counter)
   @type("uint32") ack = 0;

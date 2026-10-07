@@ -13,7 +13,7 @@ test("landed hits build a chain that adds damage; the chain drops after a pause"
   dummy.state = "flinch"; dummy.t = 1e9; // stands still
   let seq = 1;
   const before = dummy.hp;
-  const hitFor = (ticks: number) => { for (let i = 0; i < ticks; i++) { sim.setInput("p", 0, 0, true, seq++); sim.tick(); sim.drainFx(); } };
+  const hitFor = (ticks: number) => { for (let i = 0; i < ticks; i++) { sim.setInput("p", 0, 0, false, seq++); if (i % 4 === 0) sim.action("p", "attack", 1, 0); sim.tick(); sim.drainFx(); } };
   hitFor(200);
   assert.ok(p.chain >= 20, `chain ${p.chain}`);
   assert.ok(dummy.hp < before);
