@@ -149,6 +149,16 @@ The game plays animation strips automatically when they are present:
 
 Missing animations fall back to the next suitable one. A form without strips keeps its illustration.
 
+Additional animation names used since the BOTS-style rework (played automatically when present):
+
+| Form | Extra animations |
+| --- | --- |
+| Heroes (`<lineage>_<form>`) | `jump_start`, `jump_air`, `land`, `air_attack`, `guard`, `guard_impact`, `parry`, `sprint`, `dash_attack` |
+| Titans (`<lineage>_titan`) | `idle`, `run`, `attack1`, `attack2`, `special`, `hurt`, `transform_in`, `transform_out` (384 × 384 frames, anchor 192/360) |
+| New enemies (`enemy_slapper`, `enemy_roller`, `enemy_bomber`, `enemy_shield`) | Same names as other enemies; until they exist, tinted stand-ins of existing paintings are used |
+| Loot crates (`lootcrate_<tier>`) | `spin` (flight), `land`, `idle` – **installed** |
+| FX | `fx_sparkle_trail`, `fx_crate_land` (`play`) – **installed**; `client/public/assets/ui/ui_clear_burst.png` sits behind the SECTOR CLEAR title |
+
 ## Second boss: Crystal Warden (placeholder is procedural)
 
 The Crystal Warden and its shield pylons are currently drawn in code (`client/src/game/wardenArt.ts`). Copyable prompts for replacement art:

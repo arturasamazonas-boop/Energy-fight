@@ -45,6 +45,17 @@
 | Kalba | **Anglų kalba numatytoji**, lietuvių pasirenkama mygtukais EN/LT laboratorijoje ir nustatymuose. Testas tikrina, kad kiekvienas tekstas turi abu vertimus. |
 | Kovos jausmas lėkštas, bėgiojant viską galima išvengti | **KOMBO**: kiekvienas pataikęs smūgis kelia skaitiklį, kiekviena pakopa +2% žalos (iki +40%). Nemušus 2 s kombo dingsta, o stipriai gavus – sumažėja perpus. Kas 10 smūgių – pranešimas. **Smūgio svoris**: priešas atšoka ir susispaudžia, trumpam sustoja kadrai, stiprūs ir kritiniai smūgiai sudrebina ekraną. **Bėgiojimas baudžiamas**: persekiotojai iš vidutinio atstumo šoka į tave (raudona juosta įspėja ~0,4 s prieš šuolį; galima išsisukti). Persekiotojai greitesni (105→125). **Bosai lengvesni**: Motininė masė 3000→2600 gyvybių, Valdovas 2200→1900. |
 
+## Penktas etapas: perdarymas pagal BOTS!! jausmą (B variantas)
+
+| Kas | Kaip veikia dabar |
+| --- | --- |
+| **„SECTOR CLEAR!!“ ir dėžės** | Bosui žuvus sulėtėja laikas, per ekraną nusileidžia komiksinis užrašas su spindulių pliūpsniu. Iš boso kiekvienam žaidėjui aukštu lanku iššaunama jo dėžė (ChatGPT piešiniai: sukasi, palieka žvaigždučių uodegą, nusileidžia su blyksniu ir atšoka). |
+| **Valdymas** | Z/didelis mygtukas – vienas paspaudimas, vienas smūgis (ritmu – kombinacija; laikant – lėtai). C/rodyklė – šuolis su tikru aukščiu; ore Z – smūgis į žemę. X/skydas – gynyba (−80% žalos iš priekio; tiksliai laiku – ATRĖMIMAS, priešas apsvaigsta; išsekus – gynyba lūžta). Bėgimas – dvigubas krypties paspaudimas arba vairalazdės palietimas iš naujo. Šuolis išgelbsti nuo žemės atakų. |
+| **Pabudimas** | Nuo 1 lygio. Juosta pildosi kovojant. V/žaibo mygtukas – 15 s titano forma: herojus 1,6× didesnis, ×2 žala, perpus mažiau gaunamos žalos, didesnis siekis, užrašas „AWAKENED!!“. |
+| **Sektoriai 1–20** | Vietoj vienos ilgos misijos. Kiekvienas – 3 kambariai, laikmatis, likusių priešų skaičius, „GO!“ rodyklė. Bosas kas 4-ą sektorių (Motininė masė arba Kristalų Valdovas). 8 ir 18 – elitiniai, ×2 XP ir laužo. Temos: Nexus, lava, kristalai, avilys, dangus. Atrakinama įveikus ankstesnį. Kamera artėja koridoriuose, tolsta boso kovoje. |
+| **Nauji priešai** | Plakikas (greitas), Ritulys (rieda linija – peršok), Bombonešis (bombos lanku), Skydininkas (blokuoja iš priekio – apeik arba trenk iš viršaus). Vardai virš galvų, mirdami sprogsta į gabalus, išbarsto **monetas** (kiekviena +1 laužo). |
+| **Tituliai** | Rezultatuose ★ MVP (daugiausia nukauta) ir ☠ Bosų žudikas (daugiausia žalos bosui). |
+
 ## Didžiausios likusios spragos (pagal svarbą)
 
 1. **Animacijų piešiniai.** Pyra, Vektor ir Krios (visos formos, po 12 animacijų) jau animuoti tikrais kadrais. Vektor sklando ant žydros energijos auros. Liko Litos, priešai ir Valdovas.

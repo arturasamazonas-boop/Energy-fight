@@ -123,3 +123,12 @@ A window counts as able-to-act if the body was alive for at least half of it. A 
 ## Languages
 
 English is the default (`client/src/lang/en.ts`). Lithuanian lives in `client/src/i18n.ts`. The choice is stored in `localStorage["ef.lang"]` and switching reloads the page. `tests/i18n.test.ts` fails when a key exists in only one language.
+
+## BOTS-style rework (round 5)
+
+- **Controls** (`MOVES` in shared config): every attack press is buffered (0.35 s) and becomes one swing; holding only auto-attacks at 1.5× interval. Jump: velocity 470, gravity 1500, airborne (z > 22) ignores ground attacks except projectiles. An attack in the air triggers a slam (radius 92, 1.4× damage, breaks Bulwark shields). Guard: 80% frontal reduction; the meter drains 2.5 per 1% max-HP blocked and regenerates 28/s. A guard raised ≤ 0.16 s before the hit parries (no damage, attacker flinches 1.2 s). An empty meter means a 1 s stun. Run: ×1.45 speed; a running attack is a dashing finisher.
+- **Awakening** (`AWAKEN`): replaces overdrive and is available from level 1. It lasts 15 s and gives ×2 damage on top of the lineage overdrive, 0.5× damage taken, 1.35× reach and 1.6× display size. It charges passively while enemies are near.
+- **Sectors** (`shared/src/sectors.ts`): `sectorDef(n)` is deterministic and identical on server and client. Room 2 is "defend" (stabilizer) on odd sectors and waves on even ones. Room 3 is a boss on every 4th sector, otherwise final waves. Timer: `timeLimit` (fail reason `timeout`). The run ends on its own after the final clear. `profiles.sector_unlocked` (migration 5, backfilled from tiers) unlocks the next sector on a successful run. Elite sectors (n % 10 = 8) multiply XP and scrap by 2.
+- **Enemies**: slapper (fast, lunges), roller (0.75 s curl, then a 430/s straight roll for 1.15 s), bomber (lobs a strike hazard 1 s ahead), shield (140° frontal block at 15%). New kinds use tinted stand-ins for existing paintings (`ENEMY_STAND_IN`) until `enemy_<kind>` strips arrive.
+- **Coins**: 1–2 per kill (+2 elite, 14 boss), collected automatically within 52 units. They are counted per section and paid as +1 scrap each in that section's ledger row.
+- **Titles**: kills are credited to the last hitter. MVP goes to the most kills, Boss Killer to the most boss damage.
