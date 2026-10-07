@@ -175,3 +175,14 @@ body.reduce-motion .illustrated-hud .hud-chain.pop .chain-n { animation: none; }
 @keyframes clearSlam { 0% { transform: scale(3) skewX(-12deg); opacity: 0; } 12% { transform: scale(.94) skewX(-12deg); opacity: 1; } 18% { transform: scale(1.04) skewX(-12deg); } 24%, 82% { transform: scale(1) skewX(-12deg); opacity: 1; } 100% { transform: scale(1.1) skewX(-12deg); opacity: 0; } }
 @keyframes clearRays { 0% { opacity: 0; } 10%, 80% { opacity: 1; } 100% { opacity: 0; } }
 body.reduce-motion .illustrated-hud .hud-clear.show .clear-text { animation: none; transform: skewX(-12deg); }
+
+/* Sector timer, enemies left, GO arrow */
+.illustrated-hud .hud-clock { display: flex; align-items: baseline; gap: 6px; margin: 2px 0 3px; }
+.illustrated-hud .hud-clock .clock-label { font: 800 italic 11px/1 system-ui, sans-serif; color: #ffcf5a; letter-spacing: .08em; }
+.illustrated-hud .hud-clock .clock-time { font: 900 italic 22px/1 system-ui, sans-serif; color: #7ff0ff; text-shadow: 0 0 10px #39c8ff88; letter-spacing: .04em; }
+.illustrated-hud .hud-clock .enemy-count { margin-left: auto; font: 800 15px/1 system-ui, sans-serif; color: #ffb4a8; }
+.illustrated-hud .hud-clock.low .clock-time { color: #ff5a5a; text-shadow: 0 0 12px #ff0000aa; animation: clockBlink .5s steps(2) infinite; }
+@keyframes clockBlink { 50% { opacity: .35; } }
+.illustrated-hud .hud-go { position: absolute; right: calc(24px + var(--safe-r, 0px)); top: 46%; font: 900 italic 30px/1 system-ui, sans-serif; color: #ffe08a; text-shadow: 0 3px 0 #6a4300, 0 0 16px #ffb300; animation: goPulse .7s ease-in-out infinite; pointer-events: none; }
+@keyframes goPulse { 50% { transform: translateX(10px); opacity: .7; } }
+body.reduce-motion .illustrated-hud .hud-go, body.reduce-motion .illustrated-hud .hud-clock.low .clock-time { animation: none; }

@@ -25,6 +25,9 @@ test("eight simulated clients complete a mission; per-profile rewards match the 
   const code = bots[0].room.roomId;
   for (let i = 1; i < 8; i++) await bots[i].join(code, lineages[i]);
   await waitFor(() => bots.every((b) => b.state.players.size === 8), 5000, "8 players");
+  // Sector 4: tier-1 rewards and a boss, so crates are part of the check.
+  bots[0].room.send("sector", { sector: 4 });
+  await waitFor(() => bots.every((b) => b.state.sector === 4), 5000, "sector 4");
   for (const b of bots.slice(1)) b.room.send("ready", { ready: true });
   await waitFor(() => [...bots[0].state.players.values()].filter((p: any) => p.ready).length === 7, 5000, "ready");
   bots[0].room.send("start");

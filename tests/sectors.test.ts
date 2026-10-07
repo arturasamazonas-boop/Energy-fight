@@ -67,9 +67,12 @@ test("the leader can only pick an unlocked sector; the run uses it", async () =>
   const g = await app.profiles.createGuest("Leader", { level: 5, sectorUnlocked: 4 });
   const a = new NetBot(app.base, g.token);
   await a.create("pyra");
+  await waitFor(() => a.state.sector === 4, 3000, "lobby opens on the newest unlocked sector");
+  a.room.send("sector", { sector: 2 });
+  await waitFor(() => a.state.sector === 2, 3000, "sector 2");
   a.room.send("sector", { sector: 9 });
   await sleep(250);
-  assert.equal(a.state.sector, 1, "locked sector refused");
+  assert.equal(a.state.sector, 2, "locked sector refused");
   a.room.send("sector", { sector: 4 });
   await waitFor(() => a.state.sector === 4, 3000, "sector set");
   assert.equal(a.state.mission, sectorDef(4).boss);

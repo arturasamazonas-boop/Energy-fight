@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import type { Room } from "@colyseus/sdk";
 import {
+  sectorDef,
   AWAKEN,
   COMBAT,
   MOVES,
@@ -316,7 +317,18 @@ export class BattleScene extends Phaser.Scene {
     const dpr = this.game.registry.get("dpr") ?? 1;
     const h = this.scale.height / dpr;
     const zoom = (h / 400) * dpr;
-    this.cameras.main.setZoom(Math.max(0.5 * dpr, zoom));
+    this.baseZoom = Math.max(0.5 * dpr, zoom);
+    this.cameras.main.setZoom(this.baseZoom * this.zoomFactor);
+  }
+  private baseZoom = 1;
+  private zoomFactor = 1;
+
+  /** Camera framing per room: close and punchy in corridors, wide for big fights and bosses. */
+  private cameraPreset(stage: string) {
+    if (stage === "s3_boss") return 0.84;
+    if (stage === "s1_corridor" || stage === "s3_approach" || stage === "s2_activate") return 1.14;
+    if (stage === "s3_extract" || stage === "done") return 0.95;
+    return 1;
   }
 
   // ---- textures -----------------------------------------------------------------
@@ -473,10 +485,97 @@ export class BattleScene extends Phaser.Scene {
       const gateway = this.addPaintedProp("prop.gateway", x, 386, 178);
       if (gateway) this.gatewayViews.set(x, gateway);
     }
-    if ((this.room.state as any).mission === "warden") this.drawCrystalArena();
+    const sectorN = (this.room.state as any).sector as number;
+    const theme = sectorN ? sectorDef(sectorN).theme : "nexus";
+    if (theme !== "nexus") this.drawTheme(theme, top, height);
+    if ((this.room.state as any).mission === "warden" || theme === "crystal") this.drawCrystalArena();
     // These are baked into bounded-size scenery chunks and are no longer drawn
     // directly. Release their extra full-resolution GPU copies after the bake.
     for (const key of ["env.station_nexus", "env.floor"]) if (this.textures.exists(key)) this.textures.remove(key);
+  }
+
+  /**
+   * Sector theme layers (temporary until the painted sector environments arrive):
+   * what lies around the walkways (lava, crystal void, acid, clouds) plus a colour wash on the floor.
+   */
+  private drawTheme(theme: string, top: number, height: number) {
+    const T: Record<string, { hazard: [string, string, string]; wash: string; glow: string; spark: number }> = {
+      lava: { hazard: ["#2a0602", "#c2300a", "#ffb347"], wash: "#ffb08a", glow: "rgba(255,120,40,.55)", spark: 0xffa040 },
+      crystal: { hazard: ["#070818", "#2a1d6a", "#7de8ff"], wash: "#c9c2ff", glow: "rgba(140,120,255,.5)", spark: 0x9ff3ff },
+      hive: { hazard: ["#081205", "#2f5a12", "#b8f05a"], wash: "#d6f0a8", glow: "rgba(150,230,60,.45)", spark: 0xb8f05a },
+      sky: { hazard: ["#9fd4ff", "#e8f6ff", "#ffffff"], wash: "#d8ecff", glow: "rgba(255,255,255,.6)", spark: 0xffffff },
+    };
+    const th = T[theme];
+    if (!th) return;
+    for (let startX = -128, index = 0; startX < MAP.width + 128; startX += 1024, index++) {
+      const width = Math.min(1024, MAP.width + 128 - startX);
+      // 1) Hazard surface around the walkways.
+      const hz = newCanvas(width, height);
+      const ctx = hz.getContext("2d")!;
+      ctx.translate(-startX, -top);
+      ctx.save();
+      const g = ctx.createLinearGradient(0, top, 0, top + height);
+      g.addColorStop(0, th.hazard[0]);
+      g.addColorStop(0.55, th.hazard[1]);
+      g.addColorStop(1, th.hazard[0]);
+      ctx.fillStyle = g;
+      ctx.fillRect(startX, top, width, height);
+      // Veins / cloud puffs / acid ripples.
+      let seed = index * 97 + 13;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      for (let i = 0; i < 70; i++) {
+        const x = startX + rnd() * width, y = top + rnd() * height;
+        if (theme === "sky") {
+          ctx.fillStyle = `rgba(255,255,255,${0.25 + rnd() * 0.4})`;
+          ctx.beginPath();
+          ctx.ellipse(x, y, 40 + rnd() * 90, 14 + rnd() * 26, 0, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.strokeStyle = th.hazard[2];
+          ctx.globalAlpha = 0.25 + rnd() * 0.45;
+          ctx.lineWidth = 1 + rnd() * 3;
+          ctx.shadowColor = th.hazard[2];
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          let cx = x, cy = y;
+          for (let k = 0; k < 4; k++) { cx += (rnd() - 0.3) * 80; cy += (rnd() - 0.5) * 30; ctx.lineTo(cx, cy); }
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+          ctx.shadowBlur = 0;
+        }
+      }
+      // Glow where walkway edges meet the hazard (drawn before the cut so it never lies on the floor).
+      ctx.strokeStyle = th.glow;
+      ctx.lineWidth = 14;
+      for (const r of MAP.walkable) ctx.strokeRect(r.x - 4, sy(r.y) - 18, r.w + 8, r.h * DS + 54);
+      // Cut the walkways (and their stone rims) out of the hazard layer.
+      ctx.globalCompositeOperation = "destination-out";
+      for (const r of MAP.walkable) ctx.fillRect(r.x, sy(r.y) - 14, r.w, r.h * DS + 46);
+      ctx.restore();
+      const key = `theme.hazard.${index}`;
+      if (this.textures.exists(key)) this.textures.remove(key);
+      this.textures.addCanvas(key, hz);
+      const img = this.add.image(startX, top, key).setOrigin(0).setDepth(-960);
+      if (!settings.reducedMotion && theme !== "sky") this.tweens.add({ targets: img, alpha: 0.82, duration: 1400 + index * 90, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      // 2) Colour wash over the walkable floor.
+      const wash = newCanvas(width, height);
+      const w2 = wash.getContext("2d")!;
+      w2.translate(-startX, -top);
+      w2.fillStyle = th.wash;
+      for (const r of MAP.walkable) w2.fillRect(r.x, sy(r.y), r.w, r.h * DS);
+      const wkey = `theme.wash.${index}`;
+      if (this.textures.exists(wkey)) this.textures.remove(wkey);
+      this.textures.addCanvas(wkey, wash);
+      this.add.image(startX, top, wkey).setOrigin(0).setDepth(-955).setBlendMode(Phaser.BlendModes.MULTIPLY).setAlpha(0.85);
+    }
+    // Rising embers / motes / spores / wind sparkles.
+    if (settings.reducedEffects || settings.reducedMotion) return;
+    for (let i = 0; i < 46; i++) {
+      const x = Math.random() * MAP.width, y = sy(Math.random() * MAP.height);
+      const mote = this.add.circle(x, y, 1.5 + Math.random() * 2.2, th.spark, 0.8).setDepth(-800).setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({ targets: mote, y: y - 50 - Math.random() * 60, alpha: 0, duration: 2200 + Math.random() * 2600, repeat: -1, delay: Math.random() * 3000 });
+    }
   }
 
   /** Warden mission: the boss arena becomes a glowing crystal core. */
@@ -1268,6 +1367,13 @@ export class BattleScene extends Phaser.Scene {
 
   private updateCamera(me: any, dt: number) {
     const cam = this.cameras.main;
+    if (!this.ended) {
+      const want = this.cameraPreset((this.room.state as any).stage);
+      if (Math.abs(want - this.zoomFactor) > 0.002) {
+        this.zoomFactor += (want - this.zoomFactor) * Math.min(1, dt * 1.6);
+        cam.setZoom(this.baseZoom * this.zoomFactor);
+      }
+    }
     const v = me ? this.players.get(this.room.sessionId) : null;
     if (!v) return;
     const tx = sx(v.dx);
@@ -1309,6 +1415,11 @@ export class BattleScene extends Phaser.Scene {
       if (e.kind === "pylon") pylons++;
     });
     this.hud.updateObjective(st.stage === "s3_boss" && st.mission === "warden" ? "s3_boss_warden" : st.stage, st.objective, boss ? { hp: boss.hp, maxHp: boss.maxHp, stagger: boss.stagger, name: t(boss.variant === "warden" ? "boss_name_warden" : "boss_name"), shielded: pylons > 0 && boss.variant === "warden" } : null);
+    {
+      const sec = st.sector ? sectorDef(st.sector) : null;
+      const go = st.enemiesLeft === 0 && ["s1_corridor", "s2_activate", "s2_waves", "s3_approach"].includes(st.stage);
+      this.hud.updateSector(sec ? { n: sec.n, theme: sec.theme } : null, st.timeLeft, st.enemiesLeft, go);
+    }
     const team: any[] = [];
     st.players.forEach((p: any, id: string) => {
       if (id !== this.room.sessionId) team.push({ id, name: p.name, lineage: p.lineage, hp: p.hp, maxHp: p.maxHp, life: p.life, connected: p.connected });
@@ -1638,6 +1749,11 @@ export class BattleScene extends Phaser.Scene {
       case "msg":
         if (f.key.startsWith("pickup:")) {
           sfx("pickup");
+          break;
+        }
+        if (f.key === "sector_clear") {
+          this.hud.sectorClear(t("sector_clear"));
+          sfx("jackpot");
           break;
         }
         this.hud.banner(t(`msg_${f.key}`), 2400);

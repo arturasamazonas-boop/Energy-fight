@@ -29,7 +29,8 @@ export class Hud {
         </div>
       </div>
       <div class="hud-obj">
-        <div class="hud-eyebrow"><span>NEXUS</span><span class="hud-section">01 / 03</span></div>
+        <div class="hud-eyebrow"><span class="hud-sector">NEXUS</span><span class="hud-section">01 / 03</span></div>
+        <div class="hud-clock hidden"><span class="clock-label"></span><b class="clock-time">0:00</b><span class="enemy-count"></span></div>
         <div class="obj-text"></div>
         <div class="bar obj"><b></b></div>
         <div class="boss hidden"><div class="boss-name">${t("boss_name")}</div><div class="bar bosshp"><b></b></div><div class="bar stag"><b></b></div></div>
@@ -37,6 +38,7 @@ export class Hud {
       <div class="hud-team"><div class="hud-team-count"></div><div class="team-members"></div></div>
       <button class="hud-menu" aria-label="${t("menu")}">${actionGlyph("menu")}</button>
       <div class="hud-chain hidden"><b class="chain-n">0</b><span class="chain-label"></span><em class="chain-bonus"></em><i class="chain-timer"><u></u></i></div>
+      <div class="hud-go hidden">${t("go")} ➜</div>
       <div class="hud-banner hidden"></div>
       <div class="hud-clear hidden"><span class="clear-text"></span></div>
       <div class="hud-down hidden"><div class="down-skull">✖</div><div class="down-title"></div><div class="down-timer"></div><div class="bar revive"><b></b></div><div class="down-sub"></div></div>
@@ -45,7 +47,7 @@ export class Hud {
       <div class="hud-loading"><div class="loading-sigil"></div><span>${t("loading")}</span><div class="bar loading"><b></b></div></div>
       <div class="vignette"></div>`;
     parent.appendChild(this.root);
-    for (const key of ["hud-name", "hud-portrait", "hud-team", "hud-team-count", "team-members", "hud-section", "obj-text", "boss", "hud-banner", "hud-clear", "clear-text", "hud-chain", "chain-n", "chain-label", "chain-bonus", "hud-down", "down-title", "down-sub", "down-timer", "hud-end", "end-title", "end-sub", "hud-conn", "hud-loading", "vignette"]) {
+    for (const key of ["hud-name", "hud-portrait", "hud-team", "hud-team-count", "team-members", "hud-section", "hud-sector", "hud-clock", "clock-label", "clock-time", "enemy-count", "hud-go", "obj-text", "boss", "hud-banner", "hud-clear", "clear-text", "hud-chain", "chain-n", "chain-label", "chain-bonus", "hud-down", "down-title", "down-sub", "down-timer", "hud-end", "end-title", "end-sub", "hud-conn", "hud-loading", "vignette"]) {
       this.els[key] = this.root.querySelector("." + key)!;
     }
     for (const key of ["hp", "od", "obj", "bosshp", "stag", "revive", "loading"]) this.bars.set(key, this.root.querySelector(`.bar.${key} b`)!);
@@ -103,6 +105,23 @@ export class Hud {
       if (nameEl.textContent !== label) nameEl.textContent = label;
       this.els["boss"].classList.toggle("shielded", !!boss.shielded);
     }
+  }
+
+  /** Sector header: number + theme, countdown timer, enemies left and a GO arrow between rooms. */
+  updateSector(sector: { n: number; theme: string } | null, timeLeft: number, enemiesLeft: number, go: boolean) {
+    const clock = this.els["hud-clock"];
+    clock.classList.toggle("hidden", !sector);
+    this.els["hud-go"].classList.toggle("hidden", !go || this.ended);
+    if (!sector) return;
+    const head = `${t("sector_n", { n: sector.n })} · ${t("theme_" + sector.theme)}`;
+    if (this.els["hud-sector"].textContent !== head) this.els["hud-sector"].textContent = head;
+    const s = Math.max(0, Math.ceil(timeLeft));
+    const txt = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+    if (this.els["clock-time"].textContent !== txt) this.els["clock-time"].textContent = txt;
+    this.els["clock-label"].textContent = t("timer");
+    clock.classList.toggle("low", s <= 30);
+    const enemies = `☠ ${enemiesLeft}`;
+    if (this.els["enemy-count"].textContent !== enemies) this.els["enemy-count"].textContent = enemies;
   }
 
   updateTeam(list: { id: string; name: string; lineage: string; hp: number; maxHp: number; life: string; connected: boolean }[]) {

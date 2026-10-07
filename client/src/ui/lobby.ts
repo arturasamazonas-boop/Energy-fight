@@ -1,5 +1,5 @@
 import type { Room } from "@colyseus/sdk";
-import { LINEAGES, TIERS, carryMultiplier, type LineageId } from "@ef/shared";
+import { LINEAGES, SECTOR_COUNT, TIERS, carryMultiplier, sectorDef, type LineageId } from "@ef/shared";
 import type { ProfileView } from "../api.ts";
 import { t } from "../i18n.ts";
 import { esc, toast } from "./dom.ts";
@@ -20,9 +20,11 @@ export function renderLobby(root: HTMLElement, room: Room, profile: ProfileView,
         <section class="mission-panel">
           <div class="mission-art"><span class="mission-location">${UI_COPY.station}</span><span class="mission-duration">${UI_COPY.expeditionTime}</span></div>
           <div class="mission-brief"><span class="eyebrow">${UI_COPY.expedition}</span><h2 class="mission-title"></h2><p class="small mission-desc"></p></div>
-          <div class="missions">${["brood", "warden"].map((m) => `<button class="mission-pick" data-m="${m}"><b>${t("mission_" + m)}</b><small>${t("boss_" + m)}</small></button>`).join("")}</div>
+          <div class="sector-grid">${Array.from({ length: SECTOR_COUNT }, (_, i) => {
+            const d = sectorDef(i + 1);
+            return `<button class="sector-pick theme-${d.theme}${d.boss ? " boss" : ""}${d.elite ? " elite" : ""}" data-s="${d.n}" title="${t("theme_" + d.theme)}"><b>${d.n}</b>${d.boss ? '<i class="sec-boss">☠</i>' : ""}${d.elite ? '<i class="sec-elite">×2</i>' : ""}</button>`;
+          }).join("")}</div>
           <button class="daily-pick"><span class="daily-sun">☀</span><span><b>${t("daily_title")}</b><small class="daily-rule"></small></span><em class="daily-state"></em></button>
-          <div class="tiers"></div>
           <p class="small carry"></p>
           <h3>${t("lineage")}</h3>
           <div class="lpick"></div>
@@ -58,17 +60,8 @@ export function renderLobby(root: HTMLElement, room: Room, profile: ProfileView,
     b.onclick = () => room.send("lineage", { lineage: id });
     lpick.appendChild(b);
   }
-  root.querySelectorAll<HTMLButtonElement>(".mission-pick").forEach((b) => (b.onclick = () => room.send("mission", { mission: b.dataset.m })));
   $(".daily-pick").onclick = () => room.send("daily", { on: !(room.state as any).daily });
-  const tiers = $(".tiers");
-  for (const ts of TIERS) {
-    const b = document.createElement("button");
-    b.className = "tier";
-    b.dataset.tier = String(ts.tier);
-    b.innerHTML = `<b>${t("mission_tier", { tier: ts.tier })}</b><small>${t("recommended", { level: ts.recommendedLevel })}</small>`;
-    b.onclick = () => room.send("tier", { tier: ts.tier });
-    tiers.appendChild(b);
-  }
+  root.querySelectorAll<HTMLButtonElement>(".sector-pick").forEach((b) => (b.onclick = () => room.send("sector", { sector: Number(b.dataset.s) })));
   $(".ready-btn").onclick = () => {
     const me = (room.state as any).players.get(room.sessionId);
     room.send("ready", { ready: !me?.ready });
@@ -99,9 +92,22 @@ export function renderLobby(root: HTMLElement, room: Room, profile: ProfileView,
       $(".plist").innerHTML = nextRoster;
       rosterSignature = nextRoster;
     }
-    const mission = st.mission || "brood";
-    $(".mission-title").textContent = t("mission_" + mission);
-    $(".mission-desc").textContent = t("mission_" + mission + "_desc");
+    const sector = sectorDef(st.sector || 1);
+    $(".mission-title").textContent = `${t("sector_n", { n: sector.n })} · ${t("theme_" + sector.theme)}`;
+    $(".mission-desc").textContent = [
+      sector.boss ? t("boss_" + sector.boss) : t("sector_no_boss"),
+      t("sector_time", { m: Math.floor(sector.timeLimit / 60), s: String(sector.timeLimit % 60).padStart(2, "0") }),
+      t("recommended", { level: TIERS[sector.tier - 1].recommendedLevel + (sector.n - [1, 7, 14][sector.tier - 1]) }),
+      ...(sector.elite ? [t("sector_elite")] : []),
+    ].join(" · ");
+    root.querySelectorAll<HTMLButtonElement>(".sector-pick").forEach((b) => {
+      const n = Number(b.dataset.s);
+      const locked = n > (me?.sectorUnlocked ?? 1);
+      b.classList.toggle("on", n === sector.n);
+      b.classList.toggle("locked", locked);
+      b.setAttribute("aria-pressed", String(n === sector.n));
+      b.disabled = !isLeader || locked;
+    });
     {
       const d = $(".daily-pick") as HTMLButtonElement;
       d.classList.toggle("on", !!st.daily);
@@ -110,23 +116,11 @@ export function renderLobby(root: HTMLElement, room: Room, profile: ProfileView,
       $(".daily-rule").textContent = st.dailyMutator ? `${t("mut_" + st.dailyMutator)} · ${t("daily_bonus")}` : t("daily_bonus");
       $(".daily-state").textContent = st.daily ? t("daily_on") : t("daily_off");
     }
-    root.querySelectorAll<HTMLButtonElement>(".mission-pick").forEach((b) => {
-      b.classList.toggle("on", b.dataset.m === mission);
-      b.disabled = !isLeader && b.dataset.m !== mission;
-    });
-    tiers.querySelectorAll<HTMLButtonElement>(".tier").forEach((b) => {
-      const tier = Number(b.dataset.tier);
-      b.classList.toggle("on", st.tier === tier);
-      b.setAttribute("aria-pressed", String(st.tier === tier));
-      const locked = !isLeader || tier > (me?.tierUnlocked ?? 1);
-      b.disabled = locked && st.tier !== tier;
-      if (tier > (me?.tierUnlocked ?? 1) && isLeader) b.title = t("tier_locked");
-    });
     lpick.querySelectorAll<HTMLButtonElement>(".lmini").forEach((b) => {
       b.classList.toggle("on", b.dataset.id === me?.lineage);
       b.setAttribute("aria-pressed", String(b.dataset.id === me?.lineage));
     });
-    const ts = TIERS.find((x) => x.tier === st.tier)!;
+    const ts = TIERS.find((x) => x.tier === sector.tier)!;
     if (me) $(".carry").textContent = t("carry_hint", { mult: carryMultiplier(ts.recommendedLevel, me.level).toFixed(2) });
     $(".ready-btn").innerHTML = `${icon("check")}${me?.ready ? t("unset_ready") : t("set_ready")}`;
     $(".ready-btn").classList.toggle("on", !!me?.ready);

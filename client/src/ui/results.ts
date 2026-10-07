@@ -1,4 +1,4 @@
-import type { ResultsMsg } from "@ef/shared";
+import { sectorDef, type ResultsMsg } from "@ef/shared";
 import { t } from "../i18n.ts";
 import { esc } from "./dom.ts";
 import { crateBadgeHtml, revealBox } from "./loot.ts";
@@ -35,8 +35,8 @@ export function renderResults(root: HTMLElement, res: ResultsMsg, myId: string, 
     <div class="screen results illustrated-screen ${res.success ? "win" : "fail"}">
       <header class="results-head"><div class="brand">${brandHtml()}</div><span class="eyebrow">${UI_COPY.station}</span></header>
       <div class="results-banner"><div class="result-insignia">${icon(res.success ? "check" : "shield")}</div><div><span class="eyebrow">${UI_COPY.missionComplete}</span><h1>${res.success ? t("results_win") : t("results_fail")}</h1>
-      ${res.success ? "" : `<p>${t("results_fail_note")}</p>`}
-      <p>${t("mission_" + (res.mission || "brood"))} · ${t("mission_tier", { tier: res.tier })} · ${Math.floor(res.durationSec / 60)}:${String(res.durationSec % 60).padStart(2, "0")}</p></div></div>
+      ${res.success ? "" : `<p>${res.failReason === "timeout" ? `${t("msg_timeout")} ` : ""}${t("results_fail_note")}</p>`}
+      <p>${res.sector ? `${t("sector_n", { n: res.sector })} · ${t("theme_" + sectorDef(res.sector).theme)}${sectorDef(res.sector).elite ? " · ×2" : ""}` : `${t("mission_" + (res.mission || "brood"))} · ${t("mission_tier", { tier: res.tier })}`} · ${Math.floor(res.durationSec / 60)}:${String(res.durationSec % 60).padStart(2, "0")}</p></div></div>
       <div class="rgrid">${cards}</div>
       <footer class="results-footer"><p class="small">${icon("check")}${t("results_saved")}</p><button class="primary back">${t("back_to_lab")}${icon("arrow")}</button></footer>
     </div>`;

@@ -168,7 +168,14 @@ export class GameRoom extends Room {
       actionBudget: NET.maxActionsPerSecond,
       rejected: 0,
     });
-    if (!this.state.leaderId) this.state.leaderId = client.sessionId;
+    if (!this.state.leaderId) {
+      this.state.leaderId = client.sessionId;
+      // Start the lobby on the leader's newest unlocked sector.
+      const def = sectorDef(Math.min(SECTOR_COUNT, p.sectorUnlocked || 1));
+      this.state.sector = def.n;
+      this.state.tier = def.tier;
+      this.state.mission = def.boss ?? "brood";
+    }
     if (isLineage(options?.lineage)) this.svc.profiles.setLastLineage(profileId, lineage).catch(() => {});
   }
 
