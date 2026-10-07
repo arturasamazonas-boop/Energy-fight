@@ -30,6 +30,7 @@ import { SectionParticipation } from "./participation.ts";
 import { partyScaling, tierSpec } from "./progression.ts";
 import type { ActionKind, FxEvent } from "./protocol.ts";
 import { LOOT, SPECIAL_VALUES } from "./loot.ts";
+import { sectorDef, type SectorDef } from "./sectors.ts";
 
 export type Life = "alive" | "downed" | "waiting" | "departed";
 
@@ -172,8 +173,10 @@ export type Stage =
   | "s2_activate"
   | "s2_defend"
   | "s2_clear"
+  | "s2_waves"
   | "s3_approach"
   | "s3_boss"
+  | "s3_waves"
   | "s3_extract"
   | "done";
 
@@ -184,6 +187,8 @@ export interface SimOptions {
   seed?: number;
   boss?: BossVariant;
   mutator?: DailyMutator;
+  /** Numbered sector (BOTS-style). Omitted = the original NEXUS mission. */
+  sector?: number;
 }
 
 export interface SectionClear {
@@ -233,6 +238,11 @@ export class Sim {
   activateProgress = 0;
   extractT = 0;
   result: "running" | "success" | "failed" = "running";
+  /** Sector rules (null for the legacy mission), time left and enemies left in the room. */
+  sector: SectorDef | null = null;
+  timeLeft = 0;
+  enemiesLeft = 0;
+  failReason: "" | "wipe" | "timeout" = "";
   bossId: string | null = null;
   clears: SectionClear[] = [];
   private nextId = 1;
@@ -253,6 +263,14 @@ export class Sim {
     const ps = partyScaling(opts.partySize);
     this.hpMult = { regular: t.enemyHpMult * ps.regularHp, boss: t.enemyHpMult * ps.bossHp };
     this.dmgMult = t.enemyDamageMult * ps.damage;
+    if (opts.sector) {
+      const S = sectorDef(opts.sector);
+      this.sector = S;
+      this.opts = { ...opts, boss: S.boss ?? opts.boss };
+      this.hpMult = { regular: S.hpMult * ps.regularHp, boss: S.hpMult * ps.bossHp };
+      this.dmgMult = S.dmgMult * ps.damage;
+      this.timeLeft = S.timeLimit;
+    }
   }
 
   // ---- setup -----------------------------------------------------------------
@@ -448,6 +466,32 @@ export class Sim {
     this.tickDirector();
     this.sampleParticipation();
     this.checkWipe();
+    if (this.sector && this.result === "running" && this.stage !== "s3_extract") {
+      this.timeLeft = Math.max(0, this.timeLeft - DT);
+      if (this.timeLeft <= 0) {
+        this.result = "failed";
+        this.failReason = "timeout";
+        this.stage = "done";
+        this.fx.push({ t: "msg", key: "timeout" });
+      }
+    }
+    this.enemiesLeft = this.countEnemiesLeft();
+  }
+
+  /** Enemies still to defeat in the current room (alive, queued and in later waves). */
+  private countEnemiesLeft() {
+    let n = this.spawnQueue.length;
+    for (const e of this.enemies.values()) if (e.kind !== "pylon") n++;
+    const waves = this.currentWaves();
+    if (waves) for (let i = this.waveIndex; i < waves.length; i++) n += waves[i].length;
+    return n;
+  }
+
+  private currentWaves(): string[][] | null {
+    if (this.stage === "s1_waves") return this.sector ? this.sector.waves : WAVES_S1;
+    if (this.stage === "s2_waves") return this.sector?.room2Waves ?? null;
+    if (this.stage === "s3_waves") return this.sector?.finalWaves ?? null;
+    return null;
   }
 
   drainFx(): FxEvent[] {
@@ -1159,6 +1203,7 @@ export class Sim {
     }
     if (participants === 0 || alive === 0) {
       this.result = "failed";
+      this.failReason = "wipe";
       this.stage = "done";
     }
   }
@@ -1794,26 +1839,49 @@ export class Sim {
         if (this.anyPlayer((p) => p.x > 640)) {
           this.stage = "s1_waves";
           this.waveIndex = 0;
-          this.spawnWave(WAVES_S1[0], sp1);
+          this.spawnWave(this.currentWaves()![0], sp1);
           this.waveIndex = 1;
         }
         this.objective = 0;
         break;
       case "s1_waves": {
+        const W = this.currentWaves()!;
         const alive = this.enemies.size + this.spawnQueue.length;
-        if (this.waveIndex < WAVES_S1.length && alive <= 2) {
-          this.spawnWave(WAVES_S1[this.waveIndex], sp1);
+        if (this.waveIndex < W.length && alive <= 2) {
+          this.spawnWave(W[this.waveIndex], sp1);
           this.waveIndex++;
         }
-        this.objective = Math.round((Math.max(0, this.waveIndex - 1) / WAVES_S1.length) * 100);
-        if (this.waveIndex >= WAVES_S1.length && alive === 0) {
+        this.objective = Math.round((Math.max(0, this.waveIndex - 1) / W.length) * 100);
+        if (this.waveIndex >= W.length && alive === 0) {
           this.objective = 100;
           this.completeSection(1);
-          this.stage = "s2_activate";
           this.objective = 0;
-          this.spawn("pursuer", 2150, 200);
-          this.spawn("pursuer", 2150, 400);
-          this.spawn("ranged", 2500, 300);
+          if (this.sector && this.sector.room2 === "waves") {
+            this.stage = "s2_waves";
+            this.waveIndex = 0;
+          } else {
+            this.stage = "s2_activate";
+            this.spawn("pursuer", 2150, 200);
+            this.spawn("pursuer", 2150, 400);
+            this.spawn("ranged", 2500, 300);
+          }
+        }
+        break;
+      }
+      case "s2_waves": {
+        // Room 2 as a straight fight: waves start once someone walks in.
+        const W = this.currentWaves()!;
+        if (this.waveIndex === 0 && !this.anyPlayer((p) => p.x > 1880)) break;
+        const alive = this.enemies.size + this.spawnQueue.length;
+        if (this.waveIndex < W.length && alive <= 2) {
+          this.spawnWave(W[this.waveIndex], MAP.sections[1].spawnPoints);
+          this.waveIndex++;
+        }
+        this.objective = Math.round((Math.max(0, this.waveIndex - 1) / W.length) * 100);
+        if (this.waveIndex >= W.length && alive === 0) {
+          this.completeSection(2);
+          this.stage = "s3_approach";
+          this.objective = 0;
         }
         break;
       }
@@ -1875,11 +1943,31 @@ export class Sim {
         break;
       case "s3_approach":
         if (this.anyPlayer((p) => p.x > 3250)) {
+          if (this.sector && this.sector.final === "waves") {
+            this.stage = "s3_waves";
+            this.waveIndex = 0;
+            break;
+          }
           this.stage = "s3_boss";
           this.spawn("boss", MAP.bossSpawn.x, MAP.bossSpawn.y);
           this.fx.push({ t: "msg", key: "boss" });
         }
         break;
+      case "s3_waves": {
+        const W = this.currentWaves()!;
+        const alive = this.enemies.size + this.spawnQueue.length;
+        if (this.waveIndex < W.length && alive <= 2) {
+          this.spawnWave(W[this.waveIndex], MAP.sections[2].spawnPoints);
+          this.waveIndex++;
+        }
+        this.objective = Math.round((Math.max(0, this.waveIndex - 1) / W.length) * 100);
+        if (this.waveIndex >= W.length && alive === 0) {
+          this.stage = "s3_extract";
+          this.extractT = 0;
+          this.fx.push({ t: "msg", key: "sector_clear" });
+        }
+        break;
+      }
       case "s3_boss": {
         const b = this.bossId ? this.enemies.get(this.bossId) : null;
         this.objective = b ? Math.round((1 - b.hp / b.maxHp) * 100) : 100;
@@ -1895,6 +1983,8 @@ export class Sim {
           }
         }
         if (any) this.extractT += DT;
+        // Sectors end on their own after a short victory beat (crates land first).
+        if (this.sector) this.extractT += DT * 0.7;
         this.objective = Math.round(Math.min(1, this.extractT / 3) * 100);
         if (this.extractT >= 3) {
           this.completeSection(3);

@@ -176,6 +176,11 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (profile_id, day)
   )
   `,
+  // 5: numbered sectors – highest sector a profile may start
+  `
+  ALTER TABLE profiles ADD COLUMN sector_unlocked INTEGER NOT NULL DEFAULT 1;
+  UPDATE profiles SET sector_unlocked = CASE tier_unlocked WHEN 3 THEN 14 WHEN 2 THEN 7 ELSE 1 END
+  `,
 ];
 
 async function migrate(db: Db) {

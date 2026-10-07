@@ -347,6 +347,7 @@ export const EN: Record<string, string> = {
   parry: "PARRY!",
   guard_break: "Guard broken!",
   awakened: "AWAKENED!!",
+  err_sector_locked: "That sector is not unlocked yet.",
   // Controls
   ctl_jump: "Jump",
   ctl_guard: "Guard",

@@ -10,6 +10,8 @@ import {
   isLineage,
   BOSS_VARIANTS,
   BOX_TIERS,
+  SECTOR_COUNT,
+  sectorDef,
   DAILY,
   dailyKey,
   dailyMutator,
@@ -99,9 +101,13 @@ export class GameRoom extends Room {
     this.onMessage("lineage", (client, m: any) => this.onLineage(client, m));
     this.onMessage("ready", (client, m: any) => this.onReady(client, m));
     this.onMessage("tier", (client, m: any) => this.onTier(client, m));
+    this.onMessage("sector", (client, m: any) => this.onSector(client, m));
     this.onMessage("mission", (client, m: any) => {
       if (this.state.phase !== "lobby" || client.sessionId !== this.state.leaderId) return;
-      if ((BOSS_VARIANTS as readonly string[]).includes(m?.mission)) this.state.mission = m.mission;
+      if ((BOSS_VARIANTS as readonly string[]).includes(m?.mission)) {
+        this.state.mission = m.mission;
+        this.state.sector = 0; // classic NEXUS mission
+      }
     });
     this.onMessage("daily", (client, m: any) => {
       if (this.state.phase !== "lobby" || client.sessionId !== this.state.leaderId) return;
@@ -143,6 +149,7 @@ export class GameRoom extends Room {
     p.id = client.sessionId;
     p.name = profile.name;
     p.tierUnlocked = profile.tierUnlocked;
+    p.sectorUnlocked = Math.min(255, profile.sectorUnlocked);
     this.applyLobbyLineage(p, profile, lineage);
     this.refreshGear(profileId, lineage, p);
     this.svc.profiles.dailyClaimed(profileId, dailyKey()).then((done) => (p.dailyDone = done)).catch(() => {});
@@ -220,6 +227,22 @@ export class GameRoom extends Room {
       return;
     }
     this.state.tier = tier;
+    this.state.sector = 0; // classic NEXUS mission
+  }
+
+  /** Leader picks a numbered sector: any one they have unlocked. */
+  private onSector(client: Client, m: any) {
+    if (this.state.phase !== "lobby" || client.sessionId !== this.state.leaderId) return;
+    const n = Number(m?.sector);
+    const leader = this.state.players.get(client.sessionId);
+    if (!Number.isInteger(n) || n < 1 || n > SECTOR_COUNT || !leader || n > leader.sectorUnlocked) {
+      client.send("error", { code: "sector_locked" });
+      return;
+    }
+    const def = sectorDef(n);
+    this.state.sector = n;
+    this.state.tier = def.tier;
+    this.state.mission = def.boss ?? "brood";
   }
 
   private async onStart(client: Client) {
@@ -229,7 +252,7 @@ export class GameRoom extends Room {
     leader.ready = true;
     const notReady = [...this.state.players.values()].filter((p) => p.connected && !p.ready);
     if (notReady.length > 0) return client.send("error", { code: "not_all_ready" });
-    if (this.state.tier > leader.tierUnlocked) return client.send("error", { code: "tier_locked" });
+    if (this.state.sector > 0 ? this.state.sector > leader.sectorUnlocked : this.state.tier > leader.tierUnlocked) return client.send("error", { code: this.state.sector > 0 ? "sector_locked" : "tier_locked" });
     this.state.phase = "starting";
     await this.lock();
 
@@ -239,7 +262,7 @@ export class GameRoom extends Room {
     const now = Date.now();
     this.dailyDay = this.state.daily ? dailyKey(now) : "";
     this.state.dailyMutator = dailyMutator(now);
-    const sim = new Sim({ runId, tier: this.state.tier, partySize: participants.length, boss: this.state.mission as any, mutator: this.state.daily ? this.state.dailyMutator as any : undefined });
+    const sim = new Sim({ runId, tier: this.state.tier, partySize: participants.length, boss: this.state.mission as any, mutator: this.state.daily ? this.state.dailyMutator as any : undefined, sector: this.state.sector || undefined });
     for (const seat of participants) {
       const profile = await this.svc.profiles.getProfile(seat.profileId);
       if (!profile) continue;
@@ -399,6 +422,8 @@ export class GameRoom extends Room {
         levelAtStart: seat.levelAtStart,
         eligible: eligibility.get(seat.sessionId) === true,
         supportMark,
+        sector: this.state.sector || undefined,
+        mult: this.state.sector ? sectorDef(this.state.sector).rewardMult : 1,
       };
       tasks.push(async () => {
         const view = await this.awardWithRetry(award);
@@ -504,7 +529,7 @@ export class GameRoom extends Room {
           box: seat.box,
         });
       }
-      this.results = { runId: this.state.runId, mission: this.state.mission, success, tier: this.state.tier, durationSec: Math.round((Date.now() - this.startedAt) / 1000), players };
+      this.results = { runId: this.state.runId, mission: this.state.mission, sector: this.state.sector, failReason: sim.failReason, success, tier: this.state.tier, durationSec: Math.round((Date.now() - this.startedAt) / 1000), players };
       this.broadcast("results", this.results);
       await this.svc.profiles.recordRunEnd(this.state.runId, success ? "success" : "failed").catch(() => {});
     });
@@ -522,6 +547,8 @@ export class GameRoom extends Room {
     st.section = sim.section;
     st.maxX = sim.maxX;
     st.objective = sim.objective;
+    st.timeLeft = sim.timeLeft;
+    st.enemiesLeft = Math.min(65535, sim.enemiesLeft);
     st.bossId = sim.bossId && sim.enemies.has(sim.bossId) ? sim.bossId : "";
     st.queued = sim.queuedSpawns();
     st.time = sim.time;

@@ -1,5 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
+  SECTOR_COUNT,
+  sectorTier,
   LINEAGES,
   MODULES,
   MODULE_MAX_RANK,
@@ -31,6 +33,7 @@ export interface ProfileView {
   salvage: number;
   supportMarks: number;
   tierUnlocked: number;
+  sectorUnlocked: number;
   lastLineage: LineageId;
   lineages: Record<LineageId, LineageRecord>;
 }
@@ -66,17 +69,20 @@ export class ProfileService {
     return next;
   }
 
-  async createGuest(name: unknown, opts: { level?: number; tierUnlocked?: number; salvage?: number } = {}) {
+  async createGuest(name: unknown, opts: { level?: number; tierUnlocked?: number; salvage?: number; sectorUnlocked?: number } = {}) {
     const token = randomBytes(32).toString("base64url");
     const id = randomUUID();
     const level = Math.max(1, Math.min(PLAYER.levelCap, opts.level ?? 1));
     await this.db.tx(async (q) => {
-      await q.query(`INSERT INTO profiles (id, token_hash, name, tier_unlocked, salvage) VALUES ($1, $2, $3, $4, $5)`, [
+      const tierUnlocked = opts.tierUnlocked ?? 1;
+      const sectorUnlocked = opts.sectorUnlocked ?? (tierUnlocked >= 3 ? 14 : tierUnlocked === 2 ? 7 : 1);
+      await q.query(`INSERT INTO profiles (id, token_hash, name, tier_unlocked, salvage, sector_unlocked) VALUES ($1, $2, $3, $4, $5, $6)`, [
         id,
         hashToken(token),
         sanitizeName(name),
-        opts.tierUnlocked ?? 1,
+        tierUnlocked,
         opts.salvage ?? 0,
+        sectorUnlocked,
       ]);
       for (const l of LINEAGES) {
         await q.query(`INSERT INTO lineage_progress (profile_id, lineage, level) VALUES ($1, $2, $3)`, [id, l, level]);
@@ -103,6 +109,7 @@ export class ProfileService {
       salvage: Number(p.salvage),
       supportMarks: Number(p.support_marks),
       tierUnlocked: Number(p.tier_unlocked),
+      sectorUnlocked: Number(p.sector_unlocked ?? 1),
       lastLineage: p.last_lineage,
       lineages,
     };
@@ -192,6 +199,10 @@ export class ProfileService {
     levelAtStart: number;
     eligible: boolean;
     supportMark: boolean;
+    /** Sector number when the run was a numbered sector (unlocks the next one). */
+    sector?: number;
+    /** Reward multiplier (elite sectors pay double). */
+    mult?: number;
   }): Promise<SectionRewardView> {
     return this.withLock(a.profileId, () =>
       this.db.tx(async (q) => {
@@ -200,8 +211,10 @@ export class ProfileService {
         const lp = (await q.query(`SELECT * FROM lineage_progress WHERE profile_id = $1 AND lineage = $2 FOR UPDATE`, [a.profileId, a.lineage]))[0];
         await q.query(`SELECT id FROM profiles WHERE id = $1 FOR UPDATE`, [a.profileId]);
         if (!lp) throw new LabError("not_found");
-        const xp = a.eligible ? sectionXp(fullClearXp(a.tier, a.levelAtStart))[a.sectionId - 1] : 0;
-        const mats = a.eligible ? sectionMaterials(a.tier, a.runId, a.sectionId, a.profileId) : { salvage: 0, fragments: 0, bonus: false };
+        const mult = a.mult ?? 1;
+        const xp = a.eligible ? Math.round(sectionXp(fullClearXp(a.tier, a.levelAtStart))[a.sectionId - 1] * mult) : 0;
+        const baseMats = a.eligible ? sectionMaterials(a.tier, a.runId, a.sectionId, a.profileId) : { salvage: 0, fragments: 0, bonus: false };
+        const mats = { ...baseMats, salvage: Math.round(baseMats.salvage * mult) };
         const support = a.eligible && a.supportMark && a.sectionId === 3 ? 1 : 0;
         const after = applyXp({ level: Number(lp.level), xp: Number(lp.xp) }, xp);
         const inserted = await q.query(
@@ -225,7 +238,10 @@ export class ProfileService {
           await q.query(`UPDATE profiles SET salvage = salvage + $2, support_marks = support_marks + $3, updated_at = now() WHERE id = $1`, [a.profileId, mats.salvage, support]);
         }
         if (a.sectionId === 3 && a.eligible) {
-          await q.query(`UPDATE profiles SET tier_unlocked = GREATEST(tier_unlocked, $2) WHERE id = $1`, [a.profileId, Math.min(3, a.tier + 1)]);
+          if (a.sector) {
+            const next = Math.min(SECTOR_COUNT, a.sector + 1);
+            await q.query(`UPDATE profiles SET sector_unlocked = GREATEST(sector_unlocked, $2), tier_unlocked = GREATEST(tier_unlocked, $3) WHERE id = $1`, [a.profileId, next, sectorTier(next)]);
+          } else await q.query(`UPDATE profiles SET tier_unlocked = GREATEST(tier_unlocked, $2) WHERE id = $1`, [a.profileId, Math.min(3, a.tier + 1)]);
         }
         return ledgerToView(inserted[0], mats.bonus);
       }),

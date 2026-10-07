@@ -208,6 +208,7 @@ const LT_CORE: Record<string, string> = {
   parry: "ATRĖMIMAS!",
   guard_break: "Gynyba pralaužta!",
   awakened: "PABUDAI!!",
+  err_sector_locked: "Šis sektorius dar neatrakintas.",
   ctl_skill1: "1 įgūdis",
   ctl_skill2: "2 įgūdis",
   ctl_dodge: "Išsisukti",

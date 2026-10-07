@@ -8,3 +8,4 @@ export * from "./protocol.ts";
 export * from "./sim.ts";
 export * from "./bot.ts";
 export * from "./loot.ts";
+export * from "./sectors.ts";

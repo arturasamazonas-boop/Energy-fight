@@ -36,6 +36,7 @@ export class PlayerS extends Schema {
   @type("uint32") ack = 0;
   @type("float32") empower = 0;
   @type("uint8") tierUnlocked = 1;
+  @type("uint8") sectorUnlocked = 1;
   @type("string") auraRarity = "";
   @type("string") weaponRarity = "";
   @type("uint16") gear = 0;
@@ -89,6 +90,9 @@ export class GameState extends Schema {
   @type("string") leaderId = "";
   @type("uint8") tier = 1;
   @type("string") mission = "brood";
+  @type("uint8") sector = 1; // numbered sector; 0 = classic NEXUS mission
+  @type("float32") timeLeft = 0;
+  @type("uint16") enemiesLeft = 0;
   @type("boolean") daily = false;
   @type("string") dailyMutator = "";
   @type("string") runId = "";
