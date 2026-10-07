@@ -180,7 +180,14 @@ export class BattleScene extends Phaser.Scene {
     if (!this.textures.exists("enemy.pylon")) this.textures.addCanvas("enemy.pylon", pylonCanvas());
     (window as any).__efScene = this;
     (window as any).__efPerf = this.perf.stats;
-    this.loot = new LootDrops(this, this.room.sessionId);
+    this.loot = new LootDrops(this, this.room.sessionId, (id) => {
+      const v = this.players.get(id);
+      return v ? { x: v.dx, y: v.dy } : null;
+    });
+    this.loot.onLand = (mine, rank) => {
+      sfx(rank >= 3 ? "jackpot" : "pickup");
+      if (mine && !settings.reducedMotion) this.cameras.main.shake(120, 0.004 + rank * 0.001);
+    };
     this.tips = new Tips(this.hud.root, (this.room.state as any).players?.get(this.room.sessionId)?.level ?? 1);
     this.tips.show("move");
     {
@@ -235,13 +242,30 @@ export class BattleScene extends Phaser.Scene {
 
   private onLoot(m: LootMsg) {
     this.loot.spawn(m);
+    // SECTOR CLEAR!! – big comic title and a short slow-motion beat.
+    this.hud.sectorClear(t("sector_clear"));
+    sfx("section");
+    if (!settings.reducedMotion) {
+      this.cameras.main.flash(300, 255, 250, 235);
+      this.time.timeScale = 0.4;
+      this.tweens.timeScale = 0.4;
+      this.anims.globalTimeScale = 0.4;
+      window.setTimeout(() => {
+        if (this.ended) return;
+        this.time.timeScale = 1;
+        this.tweens.timeScale = 1;
+        this.anims.globalTimeScale = 1;
+      }, 900);
+    }
     const mine = m.drops.find((d) => d.id === this.room.sessionId);
     if (!mine) return;
     const rank = TIER_RANK[mine.tier as BoxTier] ?? 0;
     const head = rank >= 3 ? `${t("box_wow")} ${t("box_" + mine.tier)}!` : `${t("box_yours")}: ${t("box_" + mine.tier)}`;
-    this.hud.banner(mine.daily ? `☀ ${t("daily_won")} ${head}` : head, rank >= 3 || mine.daily ? 4200 : 2800);
-    sfx(rank >= 3 ? "jackpot" : "section");
-    if (rank >= 4 && !settings.reducedMotion) this.cameras.main.flash(400, 255, 240, 200);
+    // The crate's own banner waits until it has landed.
+    window.setTimeout(() => {
+      this.hud.banner(mine.daily ? `☀ ${t("daily_won")} ${head}` : head, rank >= 3 || mine.daily ? 4200 : 2800);
+      if (rank >= 4 && !settings.reducedMotion) this.cameras.main.flash(400, 255, 240, 200);
+    }, 2400);
   }
 
   private cleanup() {
@@ -551,6 +575,7 @@ export class BattleScene extends Phaser.Scene {
     this.drawGates(st);
     this.updateTransients(dt);
     this.loot.update(dt);
+    this.loot.drawTrail();
     this.checkTips(st, me, dt);
     this.updateCamera(me, dt);
     this.drawMarkers(st, me);
@@ -1457,7 +1482,7 @@ export class BattleScene extends Phaser.Scene {
         break;
       case "section":
         sfx("section");
-        this.hud.banner(t("section_done", { n: f.id }), 2600);
+        if (f.id < 3) this.hud.sectorClear(t("area_clear"));
         break;
       case "msg":
         if (f.key.startsWith("pickup:")) {

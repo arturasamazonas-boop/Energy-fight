@@ -38,13 +38,14 @@ export class Hud {
       <button class="hud-menu" aria-label="${t("menu")}">${actionGlyph("menu")}</button>
       <div class="hud-chain hidden"><b class="chain-n">0</b><span class="chain-label"></span><em class="chain-bonus"></em><i class="chain-timer"><u></u></i></div>
       <div class="hud-banner hidden"></div>
+      <div class="hud-clear hidden"><span class="clear-text"></span></div>
       <div class="hud-down hidden"><div class="down-skull">✖</div><div class="down-title"></div><div class="down-timer"></div><div class="bar revive"><b></b></div><div class="down-sub"></div></div>
       <div class="hud-end hidden"><div class="end-title"></div><div class="end-sub"></div></div>
       <div class="hud-conn hidden"></div>
       <div class="hud-loading"><div class="loading-sigil"></div><span>${t("loading")}</span><div class="bar loading"><b></b></div></div>
       <div class="vignette"></div>`;
     parent.appendChild(this.root);
-    for (const key of ["hud-name", "hud-portrait", "hud-team", "hud-team-count", "team-members", "hud-section", "obj-text", "boss", "hud-banner", "hud-chain", "chain-n", "chain-label", "chain-bonus", "hud-down", "down-title", "down-sub", "down-timer", "hud-end", "end-title", "end-sub", "hud-conn", "hud-loading", "vignette"]) {
+    for (const key of ["hud-name", "hud-portrait", "hud-team", "hud-team-count", "team-members", "hud-section", "obj-text", "boss", "hud-banner", "hud-clear", "clear-text", "hud-chain", "chain-n", "chain-label", "chain-bonus", "hud-down", "down-title", "down-sub", "down-timer", "hud-end", "end-title", "end-sub", "hud-conn", "hud-loading", "vignette"]) {
       this.els[key] = this.root.querySelector("." + key)!;
     }
     for (const key of ["hp", "od", "obj", "bosshp", "stag", "revive", "loading"]) this.bars.set(key, this.root.querySelector(`.bar.${key} b`)!);
@@ -145,6 +146,19 @@ export class Hud {
     element.classList.add("pop");
     clearTimeout(this.bannerTimer);
     this.bannerTimer = window.setTimeout(() => element.classList.add("hidden"), ms);
+  }
+
+  private clearTimer: number | undefined;
+  /** Huge comic-book title across the screen ("SECTOR CLEAR!!"). */
+  sectorClear(text: string, ms = 2600) {
+    if (this.ended) return;
+    const el = this.els["hud-clear"];
+    this.els["clear-text"].textContent = text;
+    el.classList.remove("hidden", "show");
+    void el.offsetWidth;
+    el.classList.add("show");
+    clearTimeout(this.clearTimer);
+    this.clearTimer = window.setTimeout(() => el.classList.add("hidden"), ms);
   }
 
   private lastChain = 0;

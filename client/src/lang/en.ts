@@ -342,6 +342,8 @@ export const EN: Record<string, string> = {
   combo_dmg: "damage",
   combo_milestone: "COMBO ×{n}!",
   obj_done: "Mission over",
+  sector_clear: "Sector clear!!",
+  area_clear: "Area clear!",
   // Controls
   ctl_skill1: "Skill 1",
   ctl_skill2: "Skill 2",

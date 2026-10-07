@@ -201,6 +201,8 @@ const LT_CORE: Record<string, string> = {
   combo_dmg: "žalos",
   combo_milestone: "KOMBO ×{n}!",
   obj_done: "Misija baigta",
+  sector_clear: "Sektorius įveiktas!!",
+  area_clear: "Zona išvalyta!",
   ctl_skill1: "1 įgūdis",
   ctl_skill2: "2 įgūdis",
   ctl_dodge: "Išsisukti",
