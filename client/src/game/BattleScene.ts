@@ -194,7 +194,7 @@ export class BattleScene extends Phaser.Scene {
     this.loot = new LootDrops(this, this.room.sessionId, (id) => {
       const v = this.players.get(id);
       return v ? { x: v.dx, y: v.dy } : null;
-    });
+    }, this.animLib);
     this.loot.onLand = (mine, rank) => {
       sfx(rank >= 3 ? "jackpot" : "pickup");
       if (mine && !settings.reducedMotion) this.cameras.main.shake(120, 0.004 + rank * 0.001);

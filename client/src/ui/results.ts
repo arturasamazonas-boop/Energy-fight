@@ -17,6 +17,7 @@ export function renderResults(root: HTMLElement, res: ResultsMsg, myId: string, 
         <div class="result-character">${portraitHtml(p.lineage, evolutions.get(p.id) ?? "", p.levelNow, "result-art")}<span>${t(p.lineage)}</span></div>
         <div class="result-detail">
         <h3>${esc(p.name)}${p.id === myId ? `<small class="you-tag">${UI_COPY.you}</small>` : ""}${p.departed ? ` <em>${t("results_departed")}</em>` : ""}</h3>
+        ${(p.titles ?? []).length ? `<div class="titles">${p.titles!.map((x) => `<span class="title-badge ${x}">${x === "mvp" ? "★ MVP" : `☠ ${t("title_boss_killer")}`}</span>`).join("")}</div>` : ""}
         <div class="big">${t("results_xp", { xp: p.totalXp })}</div>${carry}
         <div class="result-level">${p.levelNow >= 20 && p.levelAtStart >= 20 ? t("level_cap_note") : t("results_level", { from: p.levelAtStart, to: p.levelNow })}</div>
         <ul>
@@ -24,7 +25,7 @@ export function renderResults(root: HTMLElement, res: ResultsMsg, myId: string, 
           ${pending}
           ${p.supportMark ? `<li class="support">${icon("support")}${t("results_support")}</li>` : ""}
           <li class="result-currencies"><span title="${t("help_scrap_desc")}">${icon("salvage")}${t("salvage")} +${p.totalSalvage}</span></li>
-          <li>${t("results_revives", { n: p.revives })} · ${t("results_control", { n: p.controlSeconds })} · ${t("results_objective", { n: p.objectiveSeconds })}</li>
+          <li>${t("results_kills", { n: p.kills ?? 0 })} · ${t("results_revives", { n: p.revives })} · ${t("results_control", { n: p.controlSeconds })} · ${t("results_objective", { n: p.objectiveSeconds })}</li>
           <li class="dim">${t("results_damage", { n: p.damage })} · ${t("results_stagger", { n: p.stagger })}</li>
           ${missed.join("")}
         </ul></div>

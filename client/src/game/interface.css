@@ -168,7 +168,7 @@ body.reduce-motion .illustrated-hud .hud-chain.pop .chain-n { animation: none; }
 
 /* SECTOR CLEAR!! */
 .illustrated-hud .hud-clear { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 25; }
-.illustrated-hud .hud-clear::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 34%; transform: translateY(-50%); background: repeating-linear-gradient(100deg, #ffffff22 0 2px, transparent 2px 26px), radial-gradient(ellipse at center, #ffffff55, transparent 70%); opacity: 0; }
+.illustrated-hud .hud-clear::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 46%; transform: translateY(-50%); background: url("/assets/ui/ui_clear_burst.png") center / 100% 100% no-repeat, radial-gradient(ellipse at center, #ffffff55, transparent 70%); mix-blend-mode: screen; opacity: 0; }
 .illustrated-hud .hud-clear.show::before { animation: clearRays 2.6s ease-out forwards; }
 .illustrated-hud .hud-clear .clear-text { position: relative; font: 900 italic clamp(40px, 10vw, 92px)/1 "Arial Black", system-ui, sans-serif; letter-spacing: .04em; text-transform: uppercase; color: #ffd9f2; background: linear-gradient(180deg, #ffffff 0%, #ffc4ea 40%, #ff5fb8 62%, #ff9fdc 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; -webkit-text-stroke: 3px #1a3d8f; filter: drop-shadow(0 0 2px #fff) drop-shadow(0 5px 0 #0a1f5c) drop-shadow(0 0 18px #4fd2ff); }
 .illustrated-hud .hud-clear.show .clear-text { animation: clearSlam 2.6s cubic-bezier(.2, 1.5, .35, 1) forwards; }

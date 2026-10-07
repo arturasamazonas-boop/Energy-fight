@@ -85,7 +85,7 @@ export interface SimPlayer {
   odT: number;
   odBudget: number;
   moving: boolean;
-  stats: { damage: number; stagger: number; controlSeconds: number; objectiveSeconds: number; revives: number; downs: number };
+  stats: { damage: number; stagger: number; controlSeconds: number; objectiveSeconds: number; revives: number; downs: number; kills: number; bossDamage: number };
   phoenixUsed: boolean;
   phoenixT: number;
   pulseT: number;
@@ -141,6 +141,8 @@ export interface SimEnemy {
   lungeCd: number;
   lungeT: number;
   lungeHit: boolean;
+  /** Player who landed the last hit (credited with the kill). */
+  lastHitBy: string;
 }
 
 export interface Hazard {
@@ -326,7 +328,7 @@ export class Sim {
       odT: 0,
       odBudget: OVERDRIVE.maxGainPerSecond,
       moving: false,
-      stats: { damage: 0, stagger: 0, controlSeconds: 0, objectiveSeconds: 0, revives: 0, downs: 0 },
+      stats: { damage: 0, stagger: 0, controlSeconds: 0, objectiveSeconds: 0, revives: 0, downs: 0, kills: 0, bossDamage: 0 },
       phoenixUsed: false,
       phoenixT: 0,
       pulseT: SPECIAL_VALUES.pulse.every,
@@ -990,6 +992,8 @@ export class Sim {
     const dmg = Math.max(1, Math.round(raw * (1 - armor) * taken));
     e.hp = Math.max(0, e.hp - dmg);
     p.stats.damage += dmg;
+    e.lastHitBy = p.id;
+    if (e.kind === "boss") p.stats.bossDamage += dmg;
     p.stats.stagger += stagger;
     if (this.has(p, "lifesteal") && p.life === "alive" && p.healBudget > 0) {
       const heal = Math.min(p.healBudget, dmg * SPECIAL_VALUES.lifesteal, p.maxHp - p.hp);
@@ -1053,6 +1057,8 @@ export class Sim {
 
   private killEnemy(e: SimEnemy) {
     this.enemies.delete(e.id);
+    const killer = e.lastHitBy ? this.players.get(e.lastHitBy) : undefined;
+    if (killer && e.kind !== "pylon") killer.stats.kills++;
     if (e.elite === "volatile") {
       this.addHazard({ kind: "strike", side: "enemy", ownerId: e.id, x: e.x, y: e.y, r: ELITE.volatileRadius, delay: ELITE.volatileDelay, life: 0.1, dps: e.spec.damage * this.dmgMult * 1.4, slow: 0, vx: 0, vy: 0, stagger: 0, hitOnce: true });
     }
@@ -1292,6 +1298,7 @@ export class Sim {
       bossCombo: [],
       elite: affix,
       lastHitT: 0,
+      lastHitBy: "",
       lungeCd: 1.5 + this.rng() * 2,
       lungeT: 0,
       lungeHit: false,

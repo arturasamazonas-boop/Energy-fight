@@ -236,6 +236,8 @@ const LT_CORE: Record<string, string> = {
   blocked: "UŽBLOKUOTA",
   tip_shield: "Skydininkas blokuoja smūgius iš priekio – apeik jį arba peršok ir trenk iš viršaus!",
   tip_roller: "Ritulys susisuka ir rieda tiesia linija – peršok jį arba pasigink paskutinę akimirką.",
+  title_boss_killer: "Bosų žudikas",
+  results_kills: "Nukauta: {n}",
   ctl_skill1: "1 įgūdis",
   ctl_skill2: "2 įgūdis",
   ctl_dodge: "Išsisukti",

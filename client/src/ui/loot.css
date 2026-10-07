@@ -113,3 +113,9 @@
 .sector-pick.locked::after { content: "🔒"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; }
 .sector-pick.locked b { opacity: .25; }
 @media (max-width: 900px) { .sector-grid { gap: 3px; } .sector-pick { min-height: 30px; } .sector-pick b { font-size: 12px; } }
+
+/* Results titles */
+.titles { display: flex; gap: 6px; margin: 2px 0 4px; }
+.title-badge { padding: 2px 9px; border-radius: 999px; font: 900 italic 12px/1.4 system-ui, sans-serif; letter-spacing: .06em; }
+.title-badge.mvp { background: linear-gradient(90deg, #ffe08a, #ffb300); color: #4a2a00; box-shadow: 0 0 10px #ffb30088; }
+.title-badge.boss_killer { background: linear-gradient(90deg, #ff8a8a, #b01818); color: #fff; box-shadow: 0 0 10px #ff303088; }

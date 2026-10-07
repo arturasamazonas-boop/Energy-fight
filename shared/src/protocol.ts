@@ -115,6 +115,9 @@ export interface PlayerResult {
   controlSeconds: number;
   objectiveSeconds: number;
   departed: boolean;
+  kills?: number;
+  /** Titles won this run: "mvp" (most kills), "boss_killer" (most boss damage). */
+  titles?: string[];
   /** Loot crate earned for the boss kill (null if not eligible or the boss was not killed). */
   box: { tier: string; impact: number; performance: number; daily?: boolean } | null;
 }

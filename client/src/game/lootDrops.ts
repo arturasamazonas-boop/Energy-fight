@@ -5,6 +5,7 @@ import { WORLD, clampToWalkable, type BoxTier, type LootMsg } from "@ef/shared";
 import { t } from "../i18n.ts";
 import { settings } from "../settings.ts";
 import { CRATE_PALETTE, CRATE_SIZE, TIER_RANK, crateCanvas } from "./crate.ts";
+import { stripScale, type AnimLibrary } from "./animations.ts";
 
 interface Spark { x: number; y: number; life: number; color: number; size: number }
 
@@ -21,7 +22,10 @@ interface Drop {
   peak: number; // arc height in px
   bounce: number; // 0..1 after landing
   fall: number; // 1 once fully landed (kept for update logic)
-  img: Phaser.GameObjects.Image;
+  img: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite;
+  /** Painted crate strips (lootcrate_<tier>) when installed. */
+  animated: boolean;
+  baseScale: number;
   fx: Phaser.GameObjects.Graphics;
   label: Phaser.GameObjects.Text;
   seed: number;
@@ -38,7 +42,9 @@ export class LootDrops {
   /** Called once per crate when it touches down (sound/shake hooks). */
   onLand: (mine: boolean, rank: number) => void = () => {};
 
-  constructor(private scene: Phaser.Scene, private myId: string, private playerPos: PlayerPos = () => null) {}
+  constructor(private scene: Phaser.Scene, private myId: string, private playerPos: PlayerPos = () => null, private anims: AnimLibrary | null = null) {}
+
+  private trailT = 0;
 
   /**
    * Boss is down: every crate is launched out of the boss in a high spinning arc
@@ -65,9 +71,20 @@ export class LootDrops {
       const gy = ly * WORLD.depthScale;
       const mine = d.id === this.myId;
       const rank = TIER_RANK[tier];
-      const scale = (mine ? 0.62 : 0.46) * (1 + rank * 0.06);
       const sx = msg.x, sy = msg.y * WORLD.depthScale - 60;
-      const img = this.scene.add.image(sx, sy, key).setOrigin(64 / CRATE_SIZE, 116 / CRATE_SIZE).setScale(scale).setDepth(150000).setVisible(false);
+      const animId = `lootcrate_${tier}`;
+      const animated = !!this.anims?.has(animId, "spin");
+      let img: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite;
+      let scale: number;
+      if (animated) {
+        const sprite = this.scene.add.sprite(sx, sy, "");
+        const e = this.anims!.drive(sprite, animId, ["spin"])!;
+        scale = stripScale(e, (mine ? 54 : 42) * (1 + rank * 0.07), this.anims!.referenceHeight(animId));
+        img = sprite.setScale(scale).setDepth(150000).setVisible(false);
+      } else {
+        scale = (mine ? 0.62 : 0.46) * (1 + rank * 0.06);
+        img = this.scene.add.image(sx, sy, key).setOrigin(64 / CRATE_SIZE, 116 / CRATE_SIZE).setScale(scale).setDepth(150000).setVisible(false);
+      }
       const fx = this.scene.add.graphics().setDepth(gy + 1);
       const label = this.scene.add
         .text(gx, gy + 12 + (mine ? 0 : (i % 2) * 12), mine ? `${d.name}\n${t("box_" + tier)}` : t("box_" + tier), {
@@ -89,7 +106,7 @@ export class LootDrops {
         flight: 0,
         flightTime: 1.05 + Math.min(0.6, dist / 900) + rank * 0.08,
         peak: 240 + rank * 40 + Math.min(160, dist * 0.25),
-        bounce: 0, fall: 0, img, fx, label, seed: i * 1.7, landedFlash: 0,
+        bounce: 0, fall: 0, img, fx, label, seed: i * 1.7, landedFlash: 0, animated, baseScale: scale,
       });
     });
   }
@@ -113,7 +130,18 @@ export class LootDrops {
         const k = d.flight;
         const x = d.sx + (d.x - d.sx) * k;
         const y = d.sy + (d.y - d.sy) * k - Math.sin(k * Math.PI) * d.peak;
-        d.img.setPosition(x, y).setRotation(k * Math.PI * (3 + rank * 0.5)).setDepth(150000);
+        d.img.setPosition(x, y).setRotation(d.animated ? 0 : k * Math.PI * (3 + rank * 0.5)).setDepth(150000);
+        if (d.animated && this.anims?.has("fx_sparkle_trail", "play")) {
+          // Painted sparkle trail, tinted by tier.
+          this.trailT -= 1 / 60;
+          if (this.trailT <= 0) {
+            this.trailT = 0.03;
+            const spark = this.scene.add.sprite(x + (Math.random() - 0.5) * 14, y - 26 + (Math.random() - 0.5) * 14, "").setDepth(150001).setBlendMode(Phaser.BlendModes.ADD);
+            const se = this.anims.drive(spark, "fx_sparkle_trail", ["play"])!;
+            spark.setOrigin(0.5).setScale(stripScale(se, 26 + rank * 4, se.bodyHeight)).setTint(d.tier === "ultra" ? Phaser.Display.Color.HSVToRGB(Math.random(), 0.5, 1).color : P.glowHex);
+            spark.once("animationcomplete", () => spark.destroy());
+          }
+        }
         if (!reduced || Math.random() < 0.4) {
           for (let j = 0; j < (rank >= 3 ? 3 : 2); j++) {
             const color = d.tier === "ultra" ? Phaser.Display.Color.HSVToRGB((this.time * 0.8 + j * 0.2) % 1, 0.5, 1).color : j === 0 ? 0xffffff : P.glowHex;
@@ -124,14 +152,25 @@ export class LootDrops {
           d.img.setRotation(0).setDepth(d.y + 2);
           d.landedFlash = 1;
           this.onLand(d.mine, rank);
+          if (d.animated && this.anims) {
+            const sprite = d.img as Phaser.GameObjects.Sprite;
+            this.anims.drive(sprite, `lootcrate_${d.tier}`, ["land", "idle"]);
+            sprite.once("animationcomplete", () => sprite.active && this.anims!.drive(sprite, `lootcrate_${d.tier}`, ["idle"]));
+            if (this.anims.has("fx_crate_land", "play")) {
+              const burst = this.scene.add.sprite(d.x, d.y, "").setDepth(d.y + 3).setBlendMode(Phaser.BlendModes.ADD);
+              const be = this.anims.drive(burst, "fx_crate_land", ["play"])!;
+              burst.setScale(stripScale(be, 70 + rank * 14, be.bodyHeight)).setTint(P.glowHex);
+              burst.once("animationcomplete", () => burst.destroy());
+            }
+          }
         }
         continue;
       }
       if (d.bounce < 1) {
         d.bounce = Math.min(1, d.bounce + dt / 0.35);
-        const hop = Math.sin(d.bounce * Math.PI) * (26 + rank * 4);
+        const hop = Math.sin(d.bounce * Math.PI) * (d.animated ? 10 : 26 + rank * 4);
         const squash = d.bounce < 0.15 ? 1 - (0.15 - d.bounce) * 2 : 1;
-        d.img.setY(d.y - hop).setScale(d.img.scaleX, d.img.scaleX * squash);
+        d.img.setY(d.y - hop).setScale(d.baseScale, d.baseScale * (d.animated ? 1 : squash));
         if (d.bounce >= 1) {
           d.fall = 1;
           d.label.setAlpha(1);
@@ -179,7 +218,9 @@ export class LootDrops {
       }
       if (landed) {
         d.img.setY(d.y - Math.abs(Math.sin(t * 2.4)) * (d.mine ? 6 : 3));
-        if (d.tier === "ultra" && !reduced) d.img.setTint(Phaser.Display.Color.HSVToRGB((t * 0.3) % 1, 0.25, 1).color);
+        if (d.animated) {
+          // painted idle strip already shimmers
+        } else if (d.tier === "ultra" && !reduced) d.img.setTint(Phaser.Display.Color.HSVToRGB((t * 0.3) % 1, 0.25, 1).color);
         else if (rank >= 4) d.img.setAlpha(0.85 + 0.15 * Math.abs(Math.sin(t * 13)));
         if (d.mine) {
           // Bouncing marker above your own crate.

@@ -376,6 +376,8 @@ export const EN: Record<string, string> = {
   blocked: "BLOCKED",
   tip_shield: "Bulwark blocks hits from the front – go around it or jump and slam down on it!",
   tip_roller: "Roller curls up and charges in a straight line – jump over it or guard at the last moment.",
+  title_boss_killer: "Boss Killer",
+  results_kills: "Kills: {n}",
   // Controls
   ctl_jump: "Jump",
   ctl_guard: "Guard",

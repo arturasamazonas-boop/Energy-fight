@@ -534,9 +534,23 @@ export class GameRoom extends Room {
           controlSeconds: Math.round(sp.stats.controlSeconds),
           objectiveSeconds: Math.round(sp.stats.objectiveSeconds),
           departed: seat.departed,
+          kills: sp.stats.kills,
+          titles: [],
           box: seat.box,
         });
       }
+      // Titles: MVP for the most kills, Boss Killer for the most boss damage.
+      const best = (score: (id: string) => number) => {
+        let top: PlayerResult | null = null;
+        let topScore = 0;
+        for (const r of players) {
+          const v = score(r.id);
+          if (v > topScore) { topScore = v; top = r; }
+        }
+        return top;
+      };
+      best((id) => sim.players.get(id)?.stats.kills ?? 0)?.titles!.push("mvp");
+      best((id) => sim.players.get(id)?.stats.bossDamage ?? 0)?.titles!.push("boss_killer");
       this.results = { runId: this.state.runId, mission: this.state.mission, sector: this.state.sector, failReason: sim.failReason, success, tier: this.state.tier, durationSec: Math.round((Date.now() - this.startedAt) / 1000), players };
       this.broadcast("results", this.results);
       await this.svc.profiles.recordRunEnd(this.state.runId, success ? "success" : "failed").catch(() => {});
