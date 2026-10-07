@@ -203,6 +203,8 @@ export class ProfileService {
     sector?: number;
     /** Reward multiplier (elite sectors pay double). */
     mult?: number;
+    /** Energy coins collected in the section: +1 scrap each. */
+    coins?: number;
   }): Promise<SectionRewardView> {
     return this.withLock(a.profileId, () =>
       this.db.tx(async (q) => {
@@ -214,7 +216,7 @@ export class ProfileService {
         const mult = a.mult ?? 1;
         const xp = a.eligible ? Math.round(sectionXp(fullClearXp(a.tier, a.levelAtStart))[a.sectionId - 1] * mult) : 0;
         const baseMats = a.eligible ? sectionMaterials(a.tier, a.runId, a.sectionId, a.profileId) : { salvage: 0, fragments: 0, bonus: false };
-        const mats = { ...baseMats, salvage: Math.round(baseMats.salvage * mult) };
+        const mats = { ...baseMats, salvage: Math.round(baseMats.salvage * mult) + (a.eligible ? Math.max(0, Math.min(500, Math.floor(a.coins ?? 0))) : 0) };
         const support = a.eligible && a.supportMark && a.sectionId === 3 ? 1 : 0;
         const after = applyXp({ level: Number(lp.level), xp: Number(lp.xp) }, xp);
         const inserted = await q.query(

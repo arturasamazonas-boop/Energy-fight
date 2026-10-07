@@ -89,6 +89,14 @@ export const ENEMY_CAP = 24;
 
 // Bio-cell pickups heal everyone near the pickup when collected.
 export const PICKUPS = { healFraction: 0.22, shareRadius: 140, collectRadius: 34, life: 20, dropChance: 0.14, guaranteed: ["armored", "support"] as string[] };
+/** Energy coins burst out of defeated enemies; each one collected is +1 scrap at the next section reward. */
+export const COINS = { perKill: [1, 2] as [number, number], boss: 14, collectRadius: 52, life: 14, scatter: 46 };
+/** New enemy behaviours. */
+export const NEW_ENEMIES = {
+  roller: { minRange: 110, maxRange: 440, speed: 430, duration: 1.15, damageMult: 1 },
+  bomber: { flight: 1.0, radius: 72, keepAway: 200 },
+  shield: { frontArcDeg: 140, blocked: 0.15 },
+} as const;
 
 // ---- Attack / status primitives -------------------------------------------
 
@@ -429,7 +437,7 @@ export const MODULE_UPGRADE_COST = [15, 35, 60]; // salvage cost for rank 1,2,3
 export const UNLOCKS = { skill2: 3, overdrive: 1, evolution: 10, modifier: 15, mastery: 20 } as const;
 
 // ---- Enemies ---------------------------------------------------------------
-export type EnemyKind = "pursuer" | "ranged" | "armored" | "support" | "boss" | "pylon";
+export type EnemyKind = "pursuer" | "ranged" | "armored" | "support" | "boss" | "pylon" | "slapper" | "roller" | "bomber" | "shield";
 export type BossVariant = "brood" | "warden";
 export const BOSS_VARIANTS: BossVariant[] = ["brood", "warden"];
 
@@ -476,6 +484,10 @@ export const ENEMY_SPECS: Record<EnemyKind, EnemySpec> = {
   armored: { kind: "armored", hp: 260, speed: 62, radius: 22, damage: 20, armor: 0.45, attackRange: 70, windup: 0.85, recover: 0.9, cooldown: 2.2, staggerThreshold: 45, slowCap: 0.5 },
   support: { kind: "support", hp: 110, speed: 70, radius: 17, damage: 6, armor: 0, attackRange: 0, windup: 2.0, recover: 1.0, cooldown: 7, staggerThreshold: 15, slowCap: 0.6 },
   boss: { kind: "boss", hp: 2600, speed: 70, radius: 46, damage: 20, armor: 0.1, attackRange: 170, windup: 0.95, recover: 0.9, cooldown: 1.6, staggerThreshold: 160, slowCap: 0.2 },
+  slapper: { kind: "slapper", hp: 55, speed: 150, radius: 14, damage: 6, armor: 0, attackRange: 36, windup: 0.35, recover: 0.45, cooldown: 0.95, staggerThreshold: 14, slowCap: 0.6 },
+  roller: { kind: "roller", hp: 140, speed: 72, radius: 20, damage: 15, armor: 0.2, attackRange: 0, windup: 0.75, recover: 1.0, cooldown: 3.2, staggerThreshold: 30, slowCap: 0.5 },
+  bomber: { kind: "bomber", hp: 80, speed: 70, radius: 17, damage: 13, armor: 0, attackRange: 320, windup: 0.8, recover: 0.7, cooldown: 2.9, staggerThreshold: 18, slowCap: 0.6 },
+  shield: { kind: "shield", hp: 190, speed: 74, radius: 21, damage: 12, armor: 0.1, attackRange: 52, windup: 0.6, recover: 0.8, cooldown: 1.9, staggerThreshold: 40, slowCap: 0.5 },
   pylon: { kind: "pylon", hp: 220, speed: 0, radius: 24, damage: 0, armor: 0, attackRange: 0, windup: 1, recover: 1, cooldown: 99, staggerThreshold: 99999, slowCap: 0 },
 };
 

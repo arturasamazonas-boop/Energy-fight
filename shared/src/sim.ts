@@ -5,6 +5,8 @@ import {
   ACTIVITY,
   WARDEN,
   COMBAT,
+  COINS,
+  NEW_ENEMIES,
   AWAKEN,
   MOVES,
   DAILY,
@@ -64,6 +66,8 @@ export interface SimPlayer {
   /** Buffered attack presses (tap combat). */
   atkQueue: number;
   atkQueueT: number;
+  /** Coins picked up since the last section reward (paid out as scrap). */
+  coins: number;
   lastSeq: number;
   cds: { dodge: number; skill1: number; skill2: number };
   comboStep: number;
@@ -162,6 +166,7 @@ export interface Hazard {
 
 export interface Pickup {
   id: string;
+  kind: "cell" | "coin";
   x: number;
   y: number;
   life: number;
@@ -194,6 +199,7 @@ export interface SimOptions {
 export interface SectionClear {
   sectionId: number;
   eligibility: Map<string, boolean>; // playerId → eligible
+  coins: Map<string, number>; // playerId → coins collected during the section
 }
 
 const DT = 1 / 20;
@@ -303,6 +309,7 @@ export class Sim {
       stunT: 0,
       atkQueue: 0,
       atkQueueT: 0,
+      coins: 0,
       lastSeq: 0,
       cds: { dodge: 0, skill1: 0, skill2: 0 },
       comboStep: 0,
@@ -645,7 +652,7 @@ export class Sim {
           let hitAny = false;
           for (const e of [...this.enemies.values()]) {
             if (e.hp <= 0 || dist(p.x, p.y, e.x, e.y) > S.radius + e.spec.radius) continue;
-            this.damageEnemy(p, e, p.loadout.damage * S.damage, S.stagger, true, S.knockback, p.x, p.y);
+            this.damageEnemy(p, e, p.loadout.damage * S.damage, S.stagger, true, S.knockback, p.x, p.y, "slam");
             hitAny = true;
           }
           if (hitAny) this.addChain(p, 2);
@@ -964,6 +971,20 @@ export class Sim {
     }
     if (this.has(p, "firstStrike") && e.hp > e.maxHp * 0.9) raw *= 1 + SPECIAL_VALUES.firstStrike;
     raw *= 1 + Math.min(COMBAT.chainMaxBonus, p.chain * COMBAT.chainPerHit);
+    let blocked = false;
+    if (e.kind === "shield" && e.state !== "stagger" && e.state !== "flinch") {
+      if (kind === "slam") {
+        // Crashing down from above breaks the shield wall.
+        e.state = "stagger";
+        e.t = 1.6;
+        e.attack = null;
+      } else if (angleDiff(angleOf(fromX - e.x, fromY - e.y), angleOf(e.fx, e.fy)) <= (NEW_ENEMIES.shield.frontArcDeg / 2) * DEG) {
+        raw *= NEW_ENEMIES.shield.blocked;
+        blocked = true;
+        stagger *= 0.2;
+        knockback = 0;
+      }
+    }
     // The Crystal Warden is shielded while any pylon stands.
     if (e.variant === "warden" && this.pylonsAlive() > 0) raw *= 1 - WARDEN.shieldReduction;
     const dmg = Math.max(1, Math.round(raw * (1 - armor) * taken));
@@ -977,7 +998,7 @@ export class Sim {
         p.healBudget -= heal;
       }
     }
-    this.fx.push({ t: "hit", x: e.x, y: e.y, dmg, target: e.id, src: p.id, kind, crit: crit || undefined, heavy: stagger >= 6 || undefined });
+    this.fx.push({ t: "hit", x: e.x, y: e.y, dmg, target: e.id, src: p.id, kind, crit: crit || undefined, heavy: stagger >= 6 || undefined, blocked: blocked || undefined });
     if (e.state === "channel") {
       e.channelDamage += dmg;
       if (e.channelDamage >= e.maxHp * SUPPORT.interruptDamageFraction || stagger >= 10) {
@@ -1037,7 +1058,17 @@ export class Sim {
     }
     if (e.kind !== "boss" && (e.elite || PICKUPS.guaranteed.includes(e.kind) || this.rng() < PICKUPS.dropChance)) {
       const id = `k${this.nextId++}`;
-      this.pickups.set(id, { id, x: e.x, y: e.y, life: PICKUPS.life });
+      this.pickups.set(id, { id, kind: "cell", x: e.x, y: e.y, life: PICKUPS.life });
+    }
+    // Energy coins burst out of every defeated enemy.
+    if (e.kind !== "pylon") {
+      const n = e.kind === "boss" ? COINS.boss : COINS.perKill[0] + Math.floor(this.rng() * (COINS.perKill[1] - COINS.perKill[0] + 1)) + (e.elite ? 2 : 0);
+      for (let i = 0; i < n; i++) {
+        const a = this.rng() * Math.PI * 2, r = 12 + this.rng() * COINS.scatter * (e.kind === "boss" ? 2.5 : 1);
+        const c = clampToWalkable(e.x + Math.cos(a) * r, e.y + Math.sin(a) * r * 0.8, this.maxX);
+        const id = `c${this.nextId++}`;
+        this.pickups.set(id, { id, kind: "coin", x: c.x, y: c.y, life: COINS.life });
+      }
     }
     this.fx.push({ t: "death", id: e.id, kind: e.kind, x: e.x, y: e.y });
     if (this.stage === "s2_defend") this.objective = Math.min(100, this.objective + 2.1);
@@ -1179,6 +1210,20 @@ export class Sim {
   private tickPickups() {
     for (const [id, k] of this.pickups) {
       k.life -= DT;
+      if (k.kind === "coin") {
+        let best: SimPlayer | null = null;
+        let bd = COINS.collectRadius;
+        for (const p of this.players.values()) {
+          const d = p.life === "alive" ? dist(p.x, p.y, k.x, k.y) : Infinity;
+          if (d <= bd) { bd = d; best = p; }
+        }
+        if (best) {
+          best.coins++;
+          this.fx.push({ t: "coin", id: best.id, x: k.x, y: k.y });
+          this.pickups.delete(id);
+        } else if (k.life <= 0) this.pickups.delete(id);
+        continue;
+      }
       let taker: SimPlayer | null = null;
       for (const p of this.players.values()) if (p.life === "alive" && dist(p.x, p.y, k.x, k.y) <= PICKUPS.collectRadius) taker = p;
       if (taker) {
@@ -1336,7 +1381,7 @@ export class Sim {
         for (const p of this.players.values()) {
           if (p.life !== "alive" || dist(e.x, e.y, p.x, p.y) > e.spec.radius + WORLD_PLAYER_RADIUS + 8) continue;
           e.lungeHit = true;
-          this.damagePlayer(p, e.spec.damage * this.dmgMult * (e.elite ? ELITE.damage : 1) * COMBAT.lunge.damageMult, e);
+          this.damagePlayer(p, e.spec.damage * this.dmgMult * (e.elite ? ELITE.damage : 1) * (e.kind === "roller" ? NEW_ENEMIES.roller.damageMult : COMBAT.lunge.damageMult), e);
           break;
         }
       }
@@ -1401,9 +1446,32 @@ export class Sim {
       else if (d > 360) this.moveEnemy(e, target.x, target.y);
       return;
     }
+    if (e.kind === "bomber") {
+      const B = NEW_ENEMIES.bomber;
+      if (d > 360) this.moveEnemy(e, target.x, target.y);
+      else if (d < B.keepAway) this.moveEnemy(e, e.x - (target.x - e.x), e.y - (target.y - e.y), 0.8);
+      else if (e.cd <= 0) {
+        e.state = "windup";
+        e.t = e.spec.windup;
+        e.attack = { kind: "bomb", ang: angleOf(target.x - e.x, target.y - e.y), tx: target.x, ty: target.y };
+      } else this.moveEnemy(e, e.x - e.fy * 40, e.y + e.fx * 40, 0.4);
+      return;
+    }
+    if (e.kind === "roller") {
+      const R = NEW_ENEMIES.roller;
+      if (e.cd <= 0 && d >= R.minRange && d <= R.maxRange && this.attackersOn(target.id, e.id) < 2) {
+        e.state = "windup";
+        e.t = e.spec.windup;
+        e.attack = { kind: "roll", ang: angleOf(target.x - e.x, target.y - e.y), tx: target.x, ty: target.y };
+        return;
+      }
+      if (d > R.minRange) this.moveEnemy(e, target.x, target.y, 0.8);
+      else this.moveEnemy(e, e.x - (target.x - e.x), e.y - (target.y - e.y), 0.6);
+      return;
+    }
     const reach = e.spec.attackRange + e.spec.radius;
     const lunge = COMBAT.lunge;
-    if (e.kind === "pursuer" && e.lungeCd <= 0 && d >= lunge.minRange && d <= lunge.maxRange && this.attackersOn(target.id, e.id) < 2) {
+    if ((e.kind === "pursuer" || e.kind === "slapper") && e.lungeCd <= 0 && d >= lunge.minRange && d <= lunge.maxRange && this.attackersOn(target.id, e.id) < 2) {
       // Kiting is punished: a telegraphed leap closes the gap.
       e.state = "windup";
       e.t = lunge.windup;
@@ -1443,6 +1511,20 @@ export class Sim {
     e.attack = null;
     if (!a) return;
     const dmg = e.spec.damage * this.dmgMult * (e.elite ? ELITE.damage : 1);
+    if (a.kind === "bomb") {
+      const B = NEW_ENEMIES.bomber;
+      this.fx.push({ t: "bomb", x: e.x, y: e.y, tx: a.tx, ty: a.ty, flight: B.flight });
+      this.addHazard({ kind: "strike", side: "enemy", ownerId: e.id, x: a.tx, y: a.ty, r: B.radius, delay: B.flight, life: 0.1, dps: dmg, slow: 0, vx: 0, vy: 0, stagger: 0, hitOnce: true });
+      return;
+    }
+    if (a.kind === "roll") {
+      const R = NEW_ENEMIES.roller;
+      e.knock = { vx: Math.cos(a.ang) * R.speed, vy: Math.sin(a.ang) * R.speed, t: R.duration };
+      e.lungeT = R.duration;
+      e.lungeHit = false;
+      e.t = e.spec.recover + R.duration;
+      return;
+    }
     if (a.kind === "lunge") {
       const lunge = COMBAT.lunge;
       e.knock = { vx: Math.cos(a.ang) * lunge.speed, vy: Math.sin(a.ang) * lunge.speed, t: lunge.duration };
@@ -2012,13 +2094,16 @@ export class Sim {
 
   private completeSection(id: number) {
     const eligibility = new Map<string, boolean>();
+    const coins = new Map<string, number>();
     for (const p of this.players.values()) {
+      coins.set(p.id, p.coins);
+      p.coins = 0;
       const part = p.participation.get(id);
       if (!part) continue;
       part.closeWindow();
       eligibility.set(p.id, p.life !== "departed" && part.eligible());
     }
-    this.clears.push({ sectionId: id, eligibility });
+    this.clears.push({ sectionId: id, eligibility, coins });
     this.fx.push({ t: "section", id });
     if (id < 3) {
       this.section = id + 1;

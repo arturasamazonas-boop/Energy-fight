@@ -217,7 +217,8 @@ test("elite enemies: tougher, affix effects, guaranteed bio-cell", async () => {
   elite.elite = "volatile";
   elite.hp = 1;
   (sim as any).killEnemy(elite);
-  assert.equal(sim.pickups.size, 1, "elite always drops a bio-cell");
+  assert.equal([...sim.pickups.values()].filter((k) => k.kind === "cell").length, 1, "elite always drops a bio-cell");
+  assert.ok([...sim.pickups.values()].some((k) => k.kind === "coin"), "and bursts into coins");
   assert.ok([...sim.hazards.values()].some((h) => h.kind === "strike" && h.side === "enemy"), "volatile elite leaves an explosion telegraph");
   const regen = sim.spawn("pursuer", 1000, 300, true, true)!;
   regen.elite = "regen";

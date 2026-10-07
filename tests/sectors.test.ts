@@ -83,3 +83,50 @@ test("the leader can only pick an unlocked sector; the run uses it", async () =>
   await waitFor(() => a.state.timeLeft > 0 && a.state.enemiesLeft > 0, 3000, "timer and enemy count synced");
   await a.room.leave(true);
 });
+
+test("new enemies: bulwark blocks frontal hits but breaks under a slam; coins pay scrap", () => {
+  const sim = new Sim({ runId: "newe", tier: 1, partySize: 1, seed: 3 });
+  const p = sim.addPlayer("p", "pp", "P", loadoutFor("litos", 8));
+  sim.maxX = 1500;
+  p.x = 900; p.y = 300;
+  const front = sim.spawn("shield", 950, 300)!;
+  front.fx = -1; front.fy = 0; // facing the player
+  front.state = "move";
+  const back = sim.spawn("shield", 950, 300)!;
+  back.fx = 1; back.fy = 0; // facing away
+  back.state = "move";
+  (sim as any).damageEnemy(p, front, 100, 0, false, 0, p.x, p.y);
+  (sim as any).damageEnemy(p, back, 100, 0, false, 0, p.x, p.y);
+  const lostFront = front.maxHp - front.hp, lostBack = back.maxHp - back.hp;
+  assert.ok(lostFront * 4 < lostBack, `front ${lostFront} vs back ${lostBack}`);
+  (sim as any).damageEnemy(p, front, 50, 0, false, 0, p.x, p.y, "slam");
+  assert.equal(front.state, "stagger", "slam breaks the shield wall");
+
+  // Coins: kill → coins on the ground → walk over them → counted for the section.
+  const e = sim.spawn("pursuer", 905, 300)!;
+  e.hp = 1;
+  (sim as any).damageEnemy(p, e, 10, 0, false, 0, p.x, p.y);
+  let seq = 1;
+  for (let i = 0; i < 5; i++) { sim.setInput("p", 0, 0, false, seq++); sim.tick(); }
+  assert.ok(p.coins >= 1, `coins ${p.coins}`);
+});
+
+test("rollers and bombers attack with their own moves", () => {
+  const sim = new Sim({ runId: "rb", tier: 1, partySize: 1, seed: 5 });
+  const p = sim.addPlayer("p", "pp", "P", loadoutFor("pyra", 8));
+  sim.maxX = 1500;
+  p.x = 1000; p.y = 300;
+  const r = sim.spawn("roller", 700, 300)!;
+  r.state = "move"; r.cd = 0;
+  const b = sim.spawn("bomber", 1260, 300)!;
+  b.state = "move"; b.cd = 0;
+  const kinds = new Set<string>();
+  let seq = 1;
+  for (let i = 0; i < 60; i++) {
+    sim.setInput("p", 0, 0, false, seq++);
+    sim.tick();
+    for (const e of [r, b]) if (e.attack) kinds.add(e.attack.kind);
+  }
+  assert.ok(kinds.has("roll"), "roller rolls");
+  assert.ok(kinds.has("bomb"), "bomber lobs");
+});

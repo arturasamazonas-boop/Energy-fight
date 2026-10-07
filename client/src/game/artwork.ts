@@ -160,4 +160,12 @@ export function characterDisplayHeight(lineage: LineageId, level: number, evolut
   return base * growth * (evolution ? 1.08 : 1);
 }
 
-export const ENEMY_DISPLAY_HEIGHT: Record<string, number> = { pursuer: 43, ranged: 61, armored: 77, support: 60, boss: 158, pylon: 96 };
+export const ENEMY_DISPLAY_HEIGHT: Record<string, number> = { pursuer: 43, ranged: 61, armored: 77, support: 60, boss: 158, pylon: 96, slapper: 38, roller: 58, bomber: 62, shield: 74 };
+
+/** New enemy types borrow an existing painting (tinted) until their own art arrives. */
+export const ENEMY_STAND_IN: Record<string, { base: string; tint: number }> = {
+  slapper: { base: "pursuer", tint: 0xffb080 },
+  roller: { base: "armored", tint: 0xc8a8ff },
+  bomber: { base: "support", tint: 0xb8ff80 },
+  shield: { base: "armored", tint: 0x9ad8ff },
+};

@@ -392,7 +392,7 @@ export class GameRoom extends Room {
     for (let i = 0; i < this.speed && sim.result === "running"; i++) {
       sim.tick();
       fx.push(...sim.drainFx());
-      for (const c of sim.drainClears()) this.queueSectionRewards(c.sectionId, c.eligibility);
+      for (const c of sim.drainClears()) this.queueSectionRewards(c.sectionId, c.eligibility, c.coins);
     }
     if (fx.length) this.broadcast("fx", fx);
     if (sim.bossKill && !this.lootRolled) {
@@ -403,7 +403,7 @@ export class GameRoom extends Room {
     if (sim.result !== "running") this.finish(sim.result === "success");
   }
 
-  private queueSectionRewards(sectionId: number, eligibility: Map<string, boolean>) {
+  private queueSectionRewards(sectionId: number, eligibility: Map<string, boolean>, coins: Map<string, number> = new Map()) {
     const sim = this.sim!;
     for (const [id, ok] of eligibility) {
       const seat = this.seats.get(id);
@@ -431,6 +431,7 @@ export class GameRoom extends Room {
         supportMark,
         sector: this.state.sector || undefined,
         mult: this.state.sector ? sectorDef(this.state.sector).rewardMult : 1,
+        coins: coins.get(seat.sessionId) ?? 0,
       };
       tasks.push(async () => {
         const view = await this.awardWithRetry(award);
@@ -620,6 +621,7 @@ export class GameRoom extends Room {
     });
     syncMap(st.pickups, sim.pickups, PickupS, (s, k) => {
       s.id = k.id;
+      s.kind = k.kind;
       s.x = k.x;
       s.y = k.y;
     });

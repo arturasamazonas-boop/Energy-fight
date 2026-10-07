@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import type { Room } from "@colyseus/sdk";
 import {
+  NEW_ENEMIES,
   sectorDef,
   AWAKEN,
   COMBAT,
@@ -19,13 +20,14 @@ import {
 import { t } from "../i18n.ts";
 import { settings } from "../settings.ts";
 import { ENEMY_FRAME, FEET, FRAME, LINEAGE_COLORS, drawMissingArtwork, drawPickup, drawShadow, newCanvas } from "./art.ts";
-import { ILLUSTRATED_ASSETS, ENEMY_DISPLAY_HEIGHT, artworkMetrics, artworkUrl, characterArtworkKey, characterDisplayHeight, normalizeArtwork, rawArtworkKey } from "./artwork.ts";
+import { ILLUSTRATED_ASSETS, ENEMY_DISPLAY_HEIGHT, ENEMY_STAND_IN, artworkMetrics, artworkUrl, characterArtworkKey, characterDisplayHeight, normalizeArtwork, rawArtworkKey } from "./artwork.ts";
 import { sfx } from "./audio.ts";
 import type { Controls } from "./controls.ts";
 import type { Hud } from "./hud.ts";
 import { LootDrops } from "./lootDrops.ts";
 import { Tips } from "./tips.ts";
 import { PerfWatch } from "./perf.ts";
+import { coinCanvas } from "./coin.ts";
 import { crystalArenaCanvas, pylonCanvas, wardenCanvas } from "./wardenArt.ts";
 import { AnimLibrary, stripScale } from "./animations.ts";
 import { TIER_RANK } from "./crate.ts";
@@ -65,6 +67,7 @@ interface EnemyView {
   dx: number;
   dy: number;
   flash: number;
+  label?: Phaser.GameObjects.Text;
   /** Hit reaction: 1 → 0 shove away from the attacker plus squash. */
   punch?: number;
   punchX?: number;
@@ -197,7 +200,7 @@ export class BattleScene extends Phaser.Scene {
       if (mine && !settings.reducedMotion) this.cameras.main.shake(120, 0.004 + rank * 0.001);
     };
     this.tips = new Tips(this.hud.root, (this.room.state as any).players?.get(this.room.sessionId)?.level ?? 1);
-    this.tips.show("move");
+    this.tips.show("controls");
     {
       const st = this.room.state as any;
       if (st.daily && st.dailyMutator) this.time.delayedCall(900, () => this.hud.banner(`☀ ${t("daily_title")}: ${t("mut_" + st.dailyMutator)}`, 3600));
@@ -232,6 +235,8 @@ export class BattleScene extends Phaser.Scene {
     let elite = false;
     st.enemies.forEach((e: any) => {
       if (e.elite) elite = true;
+      if (e.kind === "shield") this.tips.show("shield");
+      if (e.kind === "roller") this.tips.show("roller");
       if (e.state === "windup" && Math.hypot(e.x - me.x, e.y - me.y) < 170) nearWindup = true;
     });
     if (nearWindup) this.tips.show("dodge");
@@ -244,7 +249,7 @@ export class BattleScene extends Phaser.Scene {
     if (st.pickups.size > 0) this.tips.show("pickup");
     if (st.stage === "s2_activate") this.tips.show("stabilizer");
     if (st.stage === "s3_boss") this.tips.show(st.mission === "warden" ? "warden" : "boss");
-    if (me.hasOverdrive && me.od >= 100) this.tips.show("overdrive");
+    if (me.hasOverdrive && me.od >= 100) this.tips.show("awaken");
     this.tips.update(dt);
   }
 
@@ -281,6 +286,12 @@ export class BattleScene extends Phaser.Scene {
     this.tips?.destroy();
     for (const f of this.offFns) if (typeof f === "function") f();
     this.offFns = [];
+  }
+
+  /** Small rising word over the battlefield (e.g. BLOCKED). */
+  private floatText(x: number, y: number, text: string, color: string) {
+    const label = this.add.text(sx(x), sy(y) - 50, text, { fontFamily: "system-ui, sans-serif", fontSize: "12px", fontStyle: "800", color, stroke: "#08121a", strokeThickness: 3 }).setOrigin(.5).setDepth(96000);
+    this.tweens.add({ targets: label, y: label.y - 22, alpha: 0, duration: 650, onComplete: () => label.destroy() });
   }
 
   /** Briefly pauses sprite animations (hit-stop). */
@@ -943,13 +954,19 @@ export class BattleScene extends Phaser.Scene {
       seen.add(id);
       let view = this.enemies.get(id);
       const procedural = enemy.kind === "boss" && enemy.variant === "warden" ? "enemy.warden" : enemy.kind === "pylon" ? "enemy.pylon" : "";
-      const painted = procedural ? `${procedural}.provided` : `enemy.${enemy.kind}.provided`;
+      const stand = ENEMY_STAND_IN[enemy.kind];
+      const artKind = stand && !this.textures.exists(`enemy.${enemy.kind}.provided`) ? stand.base : enemy.kind;
+      const painted = procedural ? `${procedural}.provided` : `enemy.${artKind}.provided`;
       const key = this.textures.exists(painted) ? painted : procedural || `enemy.${enemy.kind}`;
       if (!view) {
         const height = (ENEMY_DISPLAY_HEIGHT[enemy.kind] ?? 60) * (enemy.elite ? 1.2 : 1);
         const shadow = this.add.image(0, 0, "shadow").setDisplaySize(height * .9, height * .27).setDepth(-600);
         const body = this.add.sprite(0, 0, key).setOrigin(FEET.x / FRAME, FEET.y / FRAME);
         view = { body, shadow, dx: enemy.x, dy: enemy.y, flash: 0, kind: enemy.kind, height, gait: id.length * 1.7, motion: 0 };
+        // Name tag over every enemy (BOTS-style), small and quiet.
+        view.label = this.add.text(0, 0, t("enemy_" + enemy.kind) + (enemy.elite ? " ★" : ""), {
+          fontFamily: "system-ui, sans-serif", fontSize: "9px", fontStyle: "700", color: enemy.elite ? "#ffd257" : "#f3e9e4", stroke: "#1a0d12", strokeThickness: 3,
+        }).setOrigin(.5, 1).setDepth(94000).setAlpha(.85);
         this.enemies.set(id, view);
       }
       const beforeX = view.dx, beforeY = view.dy;
@@ -993,14 +1010,23 @@ export class BattleScene extends Phaser.Scene {
       }
       view.body.setDepth(sy(view.dy));
       view.shadow.setPosition(sx(view.dx), sy(view.dy) + 1).setAlpha(enemy.kind === "support" ? .55 : .9);
+      if (view.label) {
+        const bar = enemy.kind !== "boss" && enemy.hp < enemy.maxHp ? 8 : 0;
+        view.label.setPosition(sx(view.dx), sy(view.dy) - view.height - 9 - bar).setVisible(enemy.kind !== "boss" && enemy.kind !== "pylon");
+      }
+      if (enemy.kind === "roller" && enemy.state === "recover" && moving && !settings.reducedMotion) {
+        // Rolling: the curled body spins along the lane.
+        view.body.setRotation(view.body.rotation + dt * 14 * (enemy.fx < 0 ? -1 : 1));
+      }
       if (view.flash > .15) view.body.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+      else if (stand && artKind !== enemy.kind) view.body.setTint(winding ? 0xff9a8a : stand.tint).setTintMode(Phaser.TintModes.MULTIPLY);
       else if (winding || enemy.state === "channel") view.body.setTint(0xffc3ba).setTintMode(Phaser.TintModes.MULTIPLY);
       else if (enemy.state === "stagger") view.body.setTint(0xc9d0ff).setTintMode(Phaser.TintModes.MULTIPLY);
       else if (enemy.chill > 0) view.body.setTint(0xcdefff).setTintMode(Phaser.TintModes.MULTIPLY);
       else view.body.clearTint().setTintMode(Phaser.TintModes.MULTIPLY);
     });
     for (const [id, view] of this.enemies) {
-      if (!seen.has(id)) { view.body.destroy(); view.shadow.destroy(); this.enemies.delete(id); }
+      if (!seen.has(id)) { view.body.destroy(); view.shadow.destroy(); view.label?.destroy(); this.enemies.delete(id); }
     }
   }
 
@@ -1010,12 +1036,21 @@ export class BattleScene extends Phaser.Scene {
       seen.add(id);
       let img = this.pickups.get(id);
       if (!img) {
-        const key = this.textures.exists("pickup.biocell") ? "pickup.biocell" : "pickup";
-        img = this.add.image(sx(k.x), sy(k.y), key).setOrigin(.5, .7);
-        img.setScale(key === "pickup" ? .55 : 25 / (artworkMetrics(key)?.bodyHeight ?? 220));
+        if (k.kind === "coin") {
+          if (!this.textures.exists("coin")) this.textures.addCanvas("coin", coinCanvas());
+          img = this.add.image(sx(k.x), sy(k.y), "coin").setOrigin(.5, .8).setScale(.42);
+        } else {
+          const key = this.textures.exists("pickup.biocell") ? "pickup.biocell" : "pickup";
+          img = this.add.image(sx(k.x), sy(k.y), key).setOrigin(.5, .7);
+          img.setScale(key === "pickup" ? .55 : 25 / (artworkMetrics(key)?.bodyHeight ?? 220));
+        }
         this.pickups.set(id, img);
       }
-      img.setPosition(sx(k.x), sy(k.y) - 10 - Math.sin(now / 250) * 4).setDepth(sy(k.y));
+      if (k.kind === "coin") {
+        // Spinning energy coin.
+        const ph = now / 160 + k.x * 0.05;
+        img.setPosition(sx(k.x), sy(k.y) - 6 - Math.abs(Math.sin(ph * 0.6)) * 5).setDepth(sy(k.y)).setScale(.42 * Math.max(.18, Math.abs(Math.cos(ph))), .42);
+      } else img.setPosition(sx(k.x), sy(k.y) - 10 - Math.sin(now / 250) * 4).setDepth(sy(k.y));
     });
     for (const [id, img] of this.pickups) {
       if (!seen.has(id)) {
@@ -1126,6 +1161,19 @@ export class BattleScene extends Phaser.Scene {
         const cy = e.y + Math.sin(e.ang) * 45;
         g.fillEllipse(sx(cx), sy(cy), 124, 124 * DS);
         g.strokeEllipse(sx(cx), sy(cy), 124, 124 * DS);
+      } else if (e.atk === "roll") {
+        // Roller lane: long and wide – jump over it or get out of the way.
+        const R = NEW_ENEMIES.roller;
+        const len = R.speed * R.duration;
+        const ca = Math.cos(e.ang), sa = Math.sin(e.ang);
+        const px = -sa * 24, py = ca * 24;
+        g.fillStyle(0xb48cff, 0.16 + 0.2 * pulse);
+        g.fillPoints([
+          { x: sx(e.x + px), y: sy(e.y + py) }, { x: sx(e.x + ca * len + px), y: sy(e.y + sa * len + py) },
+          { x: sx(e.x + ca * len - px), y: sy(e.y + sa * len - py) }, { x: sx(e.x - px), y: sy(e.y - py) },
+        ] as unknown as Phaser.Math.Vector2[], true);
+        g.lineStyle(2, 0xd6c2ff, 0.5 + 0.3 * pulse);
+        g.lineBetween(x, y, sx(e.x + ca * len), sy(e.y + sa * len));
       } else if (e.atk === "lunge") {
         // Leap lane: a red strip with an arrow head where the pursuer will land.
         const len = COMBAT.lunge.speed * COMBAT.lunge.duration;
@@ -1174,6 +1222,19 @@ export class BattleScene extends Phaser.Scene {
       if (e.broken) {
         g.lineStyle(2, 0xe0b85a, 1);
         g.strokeRect(x + w / 2 + 3, top - 3, 7, 7);
+      }
+      if (e.kind === "shield" && e.state !== "stagger") {
+        // Front shield plate: hits from this side are blocked.
+        const ang = Math.atan2((e.fy ?? 0) * DS, e.fx ?? -1);
+        const cy = sy(v.dy) - v.height * 0.45;
+        g.lineStyle(6, 0x9ad8ff, 0.85);
+        g.beginPath();
+        g.arc(x, cy, v.height * 0.55, ang - 1.1, ang + 1.1, false);
+        g.strokePath();
+        g.lineStyle(2, 0xffffff, 0.7);
+        g.beginPath();
+        g.arc(x, cy, v.height * 0.6, ang - 0.8, ang + 0.8, false);
+        g.strokePath();
       }
       if (e.elite) {
         // Elite: pulsing ground ring and a crown in the affix colour.
@@ -1555,7 +1616,12 @@ export class BattleScene extends Phaser.Scene {
           v.punchX = attacker ? Math.sign(v.dx - attacker.dx) || 1 : 1;
         }
         const mine = f.src === myId;
-        this.damageNumber(f.x, f.y, f.dmg, mine ? (f.heavy ? "#ffd36b" : "#ffffff") : "#b9c4d0", !!f.crit);
+        if (f.blocked) {
+          if (mine) {
+            sfx("hit");
+            this.floatText(f.x, f.y, t("blocked"), "#9ad8ff");
+          }
+        } else this.damageNumber(f.x, f.y, f.dmg, mine ? (f.heavy ? "#ffd36b" : "#ffffff") : "#b9c4d0", !!f.crit);
         if (mine) {
           sfx(f.heavy || f.crit ? "skill" : "hit");
           this.hitStop = 0.05;
@@ -1643,15 +1709,31 @@ export class BattleScene extends Phaser.Scene {
             corpse.once("animationcomplete", () => corpse.destroy());
           }
         }
-        this.addTransient(0.45, (g, k) => {
-          g.fillStyle(0x7a3a60, 0.6 * (1 - k));
-          g.fillEllipse(sx(f.x), sy(f.y), 40 + 50 * k, (40 + 50 * k) * DS);
-          g.fillStyle(0xb9ff6a, 0.8 * (1 - k));
-          for (let i = 0; i < (settings.reducedEffects ? 3 : 7); i++) {
-            const a = i * 0.9;
-            g.fillCircle(sx(f.x + Math.cos(a) * 40 * k), sy(f.y + Math.sin(a) * 40 * k) - 20 - 20 * k, 3);
+        {
+          // The creature bursts apart: shell chunks fly out on arcs and bounce, energy flashes.
+          const big = f.kind === "boss" ? 3 : f.kind === "armored" || f.kind === "shield" || f.kind === "roller" ? 1.5 : 1;
+          const n = settings.reducedEffects ? 4 : Math.round(9 * big);
+          const chunks = Array.from({ length: n }, (_, i) => ({ a: (i / n) * Math.PI * 2 + Math.random() * 0.5, v: (60 + Math.random() * 90) * big, up: 120 + Math.random() * 160, s: (3 + Math.random() * 4) * big, c: [0x3a2a3e, 0x6b4a6a, 0xb9ff6a, 0x2a1c2a][i % 4] }));
+          const x0 = f.x, y0 = f.y;
+          this.addTransient(0.75, (g, k) => {
+            const fade = 1 - k;
+            g.fillStyle(0xffffff, 0.7 * Math.max(0, 1 - k * 4));
+            g.fillCircle(sx(x0), sy(y0) - 22 * big, 14 * big * (1 + k * 3));
+            g.fillStyle(0x7a3a60, 0.45 * fade);
+            g.fillEllipse(sx(x0), sy(y0), (40 + 60 * k) * big, (40 + 60 * k) * big * DS);
+            for (const c of chunks) {
+              const t2 = k * 0.75;
+              const gx = x0 + Math.cos(c.a) * c.v * t2, gy = y0 + Math.sin(c.a) * c.v * t2 * 0.8;
+              const h = Math.max(0, c.up * t2 - 520 * t2 * t2) + 18 * big * fade;
+              g.fillStyle(c.c, fade);
+              g.fillRect(sx(gx) - c.s / 2, sy(gy) - h - c.s / 2, c.s, c.s * 0.8);
+            }
+          });
+          if (big > 1 && !settings.reducedMotion && this.shakeCooldown <= 0) {
+            this.cameras.main.shake(90, 0.003 * big);
+            this.shakeCooldown = 0.12;
           }
-        });
+        }
         break;
       case "shield":
         break;
@@ -1661,6 +1743,36 @@ export class BattleScene extends Phaser.Scene {
           this.hud.banner("✦", 500);
         }
         break;
+      case "coin": {
+        if (f.id === myId) sfx("pickup");
+        const v = this.players.get(f.id);
+        if (v && !settings.reducedEffects) {
+          const x0 = sx(f.x), y0 = sy(f.y) - 8;
+          this.addTransient(0.3, (graphics, progress) => {
+            // Coin zips to the collector.
+            const tx = sx(v.dx), ty = sy(v.dy) - v.height * 0.6;
+            const x = x0 + (tx - x0) * progress, y = y0 + (ty - y0) * progress - Math.sin(progress * Math.PI) * 30;
+            graphics.fillStyle(0xffe27a, 1 - progress * 0.5);
+            graphics.fillCircle(x, y, 4);
+          });
+        }
+        break;
+      }
+      case "bomb": {
+        // Spore bomb lobbed in a high arc; its landing circle is drawn by the hazard telegraph.
+        const { x: bx, y: by, tx: btx, ty: bty, flight } = f;
+        this.addTransient(flight, (graphics, progress) => {
+          const x = bx + (btx - bx) * progress, y = by + (bty - by) * progress;
+          const h = Math.sin(progress * Math.PI) * 170 + 30 * (1 - progress);
+          graphics.fillStyle(0x2a3a10, 1);
+          graphics.fillCircle(sx(x), sy(y) - h, 7);
+          graphics.fillStyle(0xb8f05a, 0.9);
+          graphics.fillCircle(sx(x) - 2, sy(y) - h - 2, 3);
+          graphics.fillStyle(0x000000, 0.25);
+          graphics.fillEllipse(sx(x), sy(y), 14, 14 * DS);
+        });
+        break;
+      }
       case "jump":
         if (f.id !== myId) this.playOneShot(f.id, "jump_start", 180);
         break;

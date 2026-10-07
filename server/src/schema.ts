@@ -80,6 +80,7 @@ export class HazardS extends Schema {
 
 export class PickupS extends Schema {
   @type("string") id = "";
+  @type("string") kind = "cell";
   @type("float32") x = 0;
   @type("float32") y = 0;
 }

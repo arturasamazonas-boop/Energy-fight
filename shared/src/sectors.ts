@@ -48,7 +48,8 @@ export function sectorDef(nIn: number): SectorDef {
   const star = (k: string, i: number) => (elite || (late && i % 3 === 0) ? `${k}*` : k);
   // Many small fights: more enemies per wave as sectors climb, elites from sector 5.
   const size = Math.min(8, 5 + Math.floor(n / 4));
-  const roster = [P, P, R, P, A, P, R, S];
+  // New biomass types join as sectors climb: slappers (2+), bombers (3+), rollers (5+), shields (6+).
+  const roster = [P, n >= 2 ? "slapper" : P, R, n >= 3 ? "bomber" : P, A, n >= 5 ? "roller" : P, n >= 6 ? "shield" : R, S];
   const wave = (offset: number, count: number) =>
     Array.from({ length: count }, (_, i) => star(roster[(i + offset + n) % roster.length], i + offset));
   const waves = [wave(0, size - 1), wave(1, size), wave(3, size), ...(n >= 3 ? [wave(5, size + 1)] : [])];
