@@ -5,6 +5,7 @@ import {
   ACTIVITY,
   WARDEN,
   COMBAT,
+  AWAKEN,
   MOVES,
   DAILY,
   type DailyMutator,
@@ -510,6 +511,7 @@ export class Sim {
     if (this.enemyNear(p.x, p.y, 420)) p.calmT = 0;
     else p.calmT += DT;
     if (p.calmT > 4 && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + p.maxHp * PLAYER.calmRegenPerSecond * DT);
+    if (p.calmT === 0) this.gainOd(p, AWAKEN.combatGainPerSecond * DT);
 
     const ox = p.x;
     const oy = p.y;
@@ -697,6 +699,8 @@ export class Sim {
   private resolvePlayerAttack(p: SimPlayer, spec: AttackSpec, kind: "combo" | "skill1" | "skill2", step: number, skill?: SkillSpec) {
     const L = p.loadout;
     const od = p.odT > 0 ? L.spec.overdrive : null;
+    // Titan form: longer reach and heavier hits.
+    if (od) spec = { ...spec, range: spec.range * AWAKEN.rangeMult, stagger: (spec.stagger ?? 0) * 1.5, knockback: (spec.knockback ?? 0) + 10 };
     let ox = p.x;
     let oy = p.y;
     const ang = angleOf(p.fx, p.fy);
@@ -731,7 +735,7 @@ export class Sim {
     }
     hits.sort((a, b) => dist(ox, oy, a.x, a.y) - dist(ox, oy, b.x, b.y));
 
-    let mult = od ? od.damageMult : 1;
+    let mult = od ? od.damageMult * AWAKEN.damageMult : 1;
     if (kind === "combo" && p.empowerT > 0 && L.spec.dodgeEmpower) {
       mult *= 1 + L.spec.dodgeEmpower.bonus;
       p.empowerT = 0;
@@ -1065,7 +1069,7 @@ export class Sim {
     if (src && this.has(p, "thorns") && src.hp > 0 && (srcKind === "" || srcKind === "sweep")) {
       this.damageEnemy(p, src, raw * SPECIAL_VALUES.thorns, 0, false, 0, p.x, p.y, "thorns");
     }
-    let dmg = Math.round(raw * (od ? od.damageTaken : 1) * (1 - reduction));
+    let dmg = Math.round(raw * (od ? od.damageTaken * AWAKEN.damageTaken : 1) * (1 - reduction));
     if (p.shield > 0) {
       const a = Math.min(p.shield, dmg);
       p.shield -= a;

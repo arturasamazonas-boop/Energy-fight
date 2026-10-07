@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import type { Room } from "@colyseus/sdk";
 import {
+  AWAKEN,
   COMBAT,
   MOVES,
   LINEAGE_SPECS,
@@ -719,7 +720,8 @@ export class BattleScene extends Phaser.Scene {
       if (p.life === "departed") { this.removePlayer(id); return; }
       let view = this.players.get(id);
       const key = this.charTexture(p.lineage, p.evolution, p.mastery);
-      const height = characterDisplayHeight(p.lineage, p.level, p.evolution);
+      // Awakened heroes grow into their titan form.
+      const height = characterDisplayHeight(p.lineage, p.level, p.evolution) * (p.odT > 0 ? AWAKEN.scale : 1);
       if (!view) {
         const shadow = this.add.image(0, 0, "shadow").setDepth(-600);
         const body = this.add.sprite(0, 0, key).setOrigin(FEET.x / FRAME, FEET.y / FRAME);
@@ -731,7 +733,7 @@ export class BattleScene extends Phaser.Scene {
         view = { body, shadow, label, dx: p.x, dy: p.y, texKey: key, lunge: 0, hitFlash: 0, aura: 0, height, gait: phase, motion: 0, oneShot: "", oneShotUntil: 0 };
         this.players.set(id, view);
       }
-      const formId = `${p.lineage}_${p.evolution || "base"}`;
+      const formId = p.odT > 0 && this.animLib.has(`${p.lineage}_titan`) ? `${p.lineage}_titan` : `${p.lineage}_${p.evolution || "base"}`;
       const animated = this.animLib.has(formId);
       if (!animated && view.texKey !== key) { view.body.setTexture(key); view.texKey = key; }
       const isMe = id === this.room.sessionId;
@@ -1600,9 +1602,34 @@ export class BattleScene extends Phaser.Scene {
           sfx("perfect");
         }
         break;
-      case "od":
+      case "od": {
         sfx("overdrive");
         this.playOneShot(f.id, "overdrive", 600);
+        // Awakening: a pillar of energy, a shockwave and a camera punch.
+        const v = this.players.get(f.id);
+        const col = LINEAGE_COLORS[f.lin as LineageId]?.glowHex ?? 0xffffff;
+        if (v) {
+          const px = sx(v.dx), py = sy(v.dy);
+          this.addTransient(.9, (graphics, progress) => {
+            const fade = 1 - progress;
+            graphics.setBlendMode(Phaser.BlendModes.ADD);
+            graphics.fillStyle(col, 0.35 * fade);
+            graphics.fillRect(px - 28 * fade - 6, py - 420, (28 * fade + 6) * 2, 420);
+            graphics.lineStyle(6 * fade, col, fade);
+            graphics.strokeEllipse(px, py, 60 + progress * 380, (60 + progress * 380) * DS);
+            graphics.lineStyle(3 * fade, 0xffffff, fade);
+            graphics.strokeEllipse(px, py, 40 + progress * 260, (40 + progress * 260) * DS);
+          });
+        }
+        if (f.id === myId) {
+          this.hud.sectorClear(t("awakened"), 1500);
+          if (!settings.reducedMotion) {
+            this.cameras.main.flash(260, 255, 255, 255);
+            this.cameras.main.shake(380, 0.012);
+          }
+        }
+        break;
+      }
         break;
       case "section":
         sfx("section");

@@ -86,7 +86,7 @@ export class Hud {
     const overdrive = this.root.querySelector(".bar.od") as HTMLElement;
     overdrive.classList.toggle("hidden", !p.hasOverdrive);
     overdrive.classList.toggle("full", p.od >= 100 || p.odT > 0);
-    this.bar("od", p.odT > 0 ? p.odT / 8 : p.od / 100);
+    this.bar("od", p.odT > 0 ? p.odT / 15 : p.od / 100);
   }
 
   updateObjective(stage: string, objective: number, boss: { hp: number; maxHp: number; stagger: number; name?: string; shielded?: boolean } | null) {

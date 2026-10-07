@@ -38,9 +38,18 @@ export const PLAYER = {
   calmRegenPerSecond: 0.03,
 } as const;
 
+// Awakening (formerly "overdrive"): the hero bursts into a huge titan form.
+export const AWAKEN = {
+  damageMult: 2, // on top of the lineage's own overdrive flavour
+  damageTaken: 0.5,
+  rangeMult: 1.35,
+  scale: 1.6, // client display size
+  combatGainPerSecond: 1.2, // passive charge while enemies are near
+} as const;
+
 export const OVERDRIVE = {
   max: 100,
-  duration: 8,
+  duration: 15,
   maxGainPerSecond: 6,
   gainPerHit: 1.6,
   gainPerDefensive: 6,
@@ -417,7 +426,7 @@ export const MODULE_MAX_RANK = 3;
 export const MODULE_UPGRADE_COST = [15, 35, 60]; // salvage cost for rank 1,2,3
 
 // ---- Unlock levels ---------------------------------------------------------
-export const UNLOCKS = { skill2: 3, overdrive: 5, evolution: 10, modifier: 15, mastery: 20 } as const;
+export const UNLOCKS = { skill2: 3, overdrive: 1, evolution: 10, modifier: 15, mastery: 20 } as const;
 
 // ---- Enemies ---------------------------------------------------------------
 export type EnemyKind = "pursuer" | "ranged" | "armored" | "support" | "boss" | "pylon";

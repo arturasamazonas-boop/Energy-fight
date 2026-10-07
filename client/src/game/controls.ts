@@ -46,7 +46,7 @@ export class Controls {
       <div class="stick-home" aria-hidden="true"><div class="stick-knob"></div></div>
       <div class="stick-base hidden"><div class="stick-knob"></div></div>
       <div class="btn-cluster">
-        <button class="cbtn od" data-a="overdrive" aria-label="${t("ctl_overdrive")}"><span>${actionGlyph("overdrive")}</span><kbd class="action-key">R</kbd><i></i></button>
+        <button class="cbtn od" data-a="overdrive" aria-label="${t("ctl_overdrive")}"><span>${actionGlyph("overdrive")}</span><kbd class="action-key">V</kbd><i></i></button>
         <button class="cbtn s2" data-a="skill2" aria-label="${t("ctl_skill2")}"><span>${actionGlyph("skill2")}</span><kbd class="action-key">E</kbd><b class="action-index">2</b><i></i></button>
         <button class="cbtn s1" data-a="skill1" aria-label="${t("ctl_skill1")}"><span>${actionGlyph("skill1")}</span><kbd class="action-key">Q</kbd><b class="action-index">1</b><i></i></button>
         <button class="cbtn guard" data-a="guard" aria-label="${t("ctl_guard")}"><span>${actionGlyph("guard")}</span><kbd class="action-key">X</kbd><i></i></button>
